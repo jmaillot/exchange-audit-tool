@@ -1,0 +1,698 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace ExchangeAuditTool
+{
+    public sealed partial class MainForm
+    {
+        private readonly PowerShellSession _ps = new PowerShellSession();
+
+        // Shared tooltip used to reveal the full text of options whose label is
+        // truncated when the column is too narrow.
+        private readonly ToolTip _optionTip = new ToolTip
+        {
+            AutoPopDelay = 15000,
+            InitialDelay = 400,
+            ReshowDelay = 150,
+            ShowAlways = true
+        };
+
+        private Label _exoModuleStatus;
+        private Label _connStatus;
+        private Label _connectedAs;
+        private bool _logCommands = true;
+
+        private void LogCommand(string title, string script)
+        {
+            if (!_logCommands || string.IsNullOrEmpty(script)) return;
+            AppendLog("---- " + title + " ----");
+            foreach (string raw in script.Replace("\r", "").Split('\n'))
+            {
+                string line = raw.TrimEnd();
+                if (line.Trim().Length == 0) continue;
+                AppendLog("PS> " + line);
+            }
+            AppendLog("--------");
+        }
+
+        private sealed class SectionUi
+        {
+            public AuditSection Section;
+            public Dictionary<string, List<CheckBox>> Checks = new Dictionary<string, List<CheckBox>>();
+            public Dictionary<string, List<RadioButton>> Radios = new Dictionary<string, List<RadioButton>>();
+            public TextBox OutputPath;
+            public ModernButton RunButton;
+            public ModernButton OpenButton;
+            public DataGridView Grid;
+            public Label ResultInfo;
+            public string LastCsv;
+        }
+
+        private readonly Dictionary<string, SectionUi> _sectionUi = new Dictionary<string, SectionUi>();
+
+        private Control BuildConnectionPage()
+        {
+            var page = new Panel { BackColor = UiTheme.Window, Padding = new Padding(0, 0, 0, 10), AutoScroll = true };
+            var card = new RoundedPanel { Dock = DockStyle.Top, Height = 570, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(18, 14, 18, 14) };
+
+            var head = NewSectionHeader("connect", "Exchange connection", "Connect once - the session stays open until you close the app.");
+
+            var modeGroup = new Panel { Dock = DockStyle.Top, Height = 66, BackColor = UiTheme.Surface };
+            var rInteractive = NewRadio("Exchange Online (interactive)", true);
+            var rApp = NewRadio("Exchange Online (app-only cert)", false);
+            var rLocal = NewRadio("On-premises (run on Exchange server)", false);
+            var rRemote = NewRadio("On-premises (remote PowerShell)", false);
+            rInteractive.Location = new Point(0, 6); rInteractive.Width = 250;
+            rApp.Location = new Point(260, 6); rApp.Width = 260;
+            rLocal.Location = new Point(0, 36); rLocal.Width = 300;
+            rRemote.Location = new Point(300, 36); rRemote.Width = 300;
+            modeGroup.Controls.Add(rInteractive); modeGroup.Controls.Add(rApp);
+            modeGroup.Controls.Add(rLocal); modeGroup.Controls.Add(rRemote);
+
+            var moduleRow = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = UiTheme.Surface };
+            var moduleLabel = new Label { Text = "EXO module:", Dock = DockStyle.Left, Width = 90, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
+            _exoModuleStatus = new Label { Text = "checking...", Dock = DockStyle.Left, Width = 300, ForeColor = UiTheme.Orange, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 8.8F) };
+            var checkBtn = new ModernButton { Text = "Re-check", Dock = DockStyle.Right, Width = 96, Height = 26, Padding = new Padding(0) };
+            checkBtn.Click += delegate { CheckExoModuleAsync(); };
+            moduleRow.Controls.Add(_exoModuleStatus);
+            moduleRow.Controls.Add(moduleLabel);
+            moduleRow.Controls.Add(checkBtn);
+
+            var connectedRow = new Panel { Dock = DockStyle.Top, Height = 30, BackColor = UiTheme.Surface };
+            var connectedLabel = new Label { Text = "Connected as:", Dock = DockStyle.Left, Width = 90, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
+            _connectedAs = new Label { Text = "not connected", Dock = DockStyle.Left, Width = 420, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
+            connectedRow.Controls.Add(_connectedAs);
+            connectedRow.Controls.Add(connectedLabel);
+
+            var logCmdRow = new Panel { Dock = DockStyle.Top, Height = 28, BackColor = UiTheme.Surface };
+            var cbLogCmd = new CheckBox { Text = "Log executed PowerShell commands in the Activity Log", Checked = _logCommands, AutoSize = true, Location = new Point(0, 4), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
+            cbLogCmd.CheckedChanged += delegate { _logCommands = cbLogCmd.Checked; };
+            logCmdRow.Controls.Add(cbLogCmd);
+
+            var tbUpn = NewField();
+            var tbAppId = NewField();
+            var tbOrg = NewField();
+            var tbThumb = NewField();
+
+            var rowUpn = NewLabeledRow("User principal name", tbUpn);
+
+            var rowDevice = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = UiTheme.Surface };
+            var cbDevice = new CheckBox { Text = "Open external browser for sign-in (disable WAM) - recommended", Checked = ConnectionSettings.DisableWam, AutoSize = true, Location = new Point(150, 8), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
+            rowDevice.Controls.Add(cbDevice);
+
+            var rowAppId = NewLabeledRow("Application (client) ID", tbAppId);
+            var rowOrg = NewLabeledRow("Tenant (organization)", tbOrg);
+            var rowThumb = NewLabeledRow("Certificate thumbprint", tbThumb);
+            var rowLocalInfo = new Panel { Dock = DockStyle.Top, Height = 44, BackColor = UiTheme.Surface };
+            var localInfo = new Label { Dock = DockStyle.Fill, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.3F), TextAlign = ContentAlignment.MiddleLeft,
+                Text = "Run the tool on the Exchange server. It loads RemoteExchange.ps1 (2013/2016/2019) or the E2010 snap-in automatically - no fields needed." };
+            rowLocalInfo.Controls.Add(localInfo);
+
+            // ---- Remote on-premises (implicit remoting) fields --------------------------
+            var tbRemoteServer = NewField();
+            var tbRemoteUser = NewField();
+            var rowRemoteServer = NewLabeledRow("Exchange server (FQDN)", tbRemoteServer);
+            var rowRemoteUser = NewLabeledRow("Username (optional)", tbRemoteUser);
+
+            var rowRemoteAuth = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = UiTheme.Surface };
+            var authLabel = new Label { Text = "Authentication", Dock = DockStyle.Left, Width = 150, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
+            var rKerb = new RadioButton { Text = "Kerberos (domain-joined)", Checked = true, AutoSize = true, Location = new Point(154, 10), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
+            var rBasic = new RadioButton { Text = "Basic (off-domain)", Checked = false, AutoSize = true, Location = new Point(330, 10), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
+            var cbHttps = new CheckBox { Text = "Use HTTPS", Checked = false, AutoSize = true, Location = new Point(470, 10), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
+            rowRemoteAuth.Controls.Add(cbHttps);
+            rowRemoteAuth.Controls.Add(rBasic);
+            rowRemoteAuth.Controls.Add(rKerb);
+            rowRemoteAuth.Controls.Add(authLabel);
+
+            var rowRemoteInfo = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = UiTheme.Surface };
+            var remoteInfo = new Label { Dock = DockStyle.Fill, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.3F), TextAlign = ContentAlignment.MiddleLeft,
+                Text = "Opens a remote session to http(s)://<server>/PowerShell/ and imports the cmdlets. Kerberos uses your identity; Basic prompts securely (use HTTPS)." };
+            rowRemoteInfo.Controls.Add(remoteInfo);
+
+            // Keep Basic and HTTPS in sync (Basic should be used over HTTPS).
+            rBasic.CheckedChanged += delegate { if (rBasic.Checked) cbHttps.Checked = true; };
+
+            var fields = new Panel { Dock = DockStyle.Top, Height = 220, BackColor = UiTheme.Surface, Padding = new Padding(0, 8, 0, 0) };
+            fields.Controls.Add(rowLocalInfo);
+            fields.Controls.Add(rowRemoteInfo);
+            fields.Controls.Add(rowRemoteAuth);
+            fields.Controls.Add(rowRemoteUser);
+            fields.Controls.Add(rowRemoteServer);
+            fields.Controls.Add(rowThumb);
+            fields.Controls.Add(rowOrg);
+            fields.Controls.Add(rowAppId);
+            fields.Controls.Add(rowDevice);
+            fields.Controls.Add(rowUpn);
+
+            Action applyMode = delegate
+            {
+                bool interactive = rInteractive.Checked;
+                bool app = rApp.Checked;
+                bool local = rLocal.Checked;
+                bool remote = rRemote.Checked;
+                rowUpn.Visible = interactive;
+                rowDevice.Visible = interactive;
+                rowAppId.Visible = app; rowOrg.Visible = app; rowThumb.Visible = app;
+                rowLocalInfo.Visible = local;
+                rowRemoteServer.Visible = remote;
+                rowRemoteUser.Visible = remote;
+                rowRemoteAuth.Visible = remote;
+                rowRemoteInfo.Visible = remote;
+            };
+            rInteractive.CheckedChanged += delegate { applyMode(); };
+            rApp.CheckedChanged += delegate { applyMode(); };
+            rLocal.CheckedChanged += delegate { applyMode(); };
+            rRemote.CheckedChanged += delegate { applyMode(); };
+
+            var buttons = new Panel { Dock = DockStyle.Bottom, Height = 48, BackColor = UiTheme.Surface };
+            var save = new ModernButton { Text = "Connect", Width = 160, Height = 36, Location = new Point(0, 8) };
+            save.NormalColor = UiTheme.Blue; save.BackColor = UiTheme.Blue; save.ForeColor = Color.White;
+            var installMod = new ModernButton { Text = "Install EXO module", Width = 170, Height = 36, Location = new Point(170, 8) };
+            var disconnectBtn = new ModernButton { Text = "Disconnect", Width = 120, Height = 36, Location = new Point(348, 8) };
+            _connStatus = new Label { Text = ConnectionSettings.Summary(), Location = new Point(478, 16), AutoSize = true, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F) };
+            buttons.Controls.Add(save); buttons.Controls.Add(installMod); buttons.Controls.Add(disconnectBtn); buttons.Controls.Add(_connStatus);
+
+            save.Click += async delegate
+            {
+                if (_ps.IsAlive)
+                {
+                    AppendLog("Closing previous session before applying new settings...");
+                    await RunPowerShellCaptureAsync(ConnectionSettings.BuildDisconnect());
+                }
+
+                ConnectionSettings.Mode = rInteractive.Checked ? ConnectionMode.ExchangeOnlineInteractive
+                                        : rApp.Checked ? ConnectionMode.ExchangeOnlineApp
+                                        : rLocal.Checked ? ConnectionMode.OnPremisesLocal
+                                        : ConnectionMode.OnPremisesRemote;
+                ConnectionSettings.Upn = tbUpn.Text.Trim();
+                ConnectionSettings.DisableWam = cbDevice.Checked;
+                ConnectionSettings.AppId = tbAppId.Text.Trim();
+                ConnectionSettings.Organization = tbOrg.Text.Trim();
+                ConnectionSettings.CertThumbprint = tbThumb.Text.Trim();
+                ConnectionSettings.RemoteServer = tbRemoteServer.Text.Trim();
+                ConnectionSettings.RemoteUser = tbRemoteUser.Text.Trim();
+                ConnectionSettings.RemoteAuth = rBasic.Checked ? RemoteAuthMode.Basic : RemoteAuthMode.Kerberos;
+                ConnectionSettings.RemoteUseHttps = cbHttps.Checked;
+
+                if (rRemote.Checked && string.IsNullOrEmpty(ConnectionSettings.RemoteServer))
+                {
+                    Warn("Enter the Exchange server FQDN for the remote PowerShell connection.");
+                    return;
+                }
+
+                _connStatus.Text = ConnectionSettings.Summary();
+
+                SetFooter("Connecting...", UiTheme.Orange);
+                SetBusy(true);
+                AppendLog("Establishing connection: " + ConnectionSettings.Summary());
+                string connectScript = ConnectionSettings.BuildPrelude() + "Write-Host 'Connection ready.'";
+                LogCommand("Connect - PowerShell", connectScript);
+                var r = await RunPowerShellStreamingAsync(connectScript, 300000);
+                SetBusy(false);
+                bool ok = r.ExitCode == 0;
+                SetFooter(ok ? "Connected" : "Connection failed", ok ? UiTheme.Green : UiTheme.Red);
+                if (ok)
+                {
+                    ApplyScopeDefaults(ConnectionSettings.IsOnline);
+                    await RefreshConnectedAsAsync();
+                }
+                else SetConnectedAs(null);
+            };
+
+            installMod.Click += async delegate
+            {
+                AppendLog("Installing ExchangeOnlineManagement module for current user...");
+                SetBusy(true);
+                string installScript = "Install-Module ExchangeOnlineManagement -Scope CurrentUser -Force -AllowClobber; " +
+                    "Import-Module ExchangeOnlineManagement; Write-Host ('Installed ' + (Get-Module ExchangeOnlineManagement).Version.ToString())";
+                LogCommand("Install EXO module - PowerShell", installScript);
+                var r = await RunPowerShellCaptureAsync(installScript);
+                SetBusy(false);
+                AppendLog(r.Output);
+                SetFooter(r.ExitCode == 0 ? "EXO module ready" : "Module install failed", r.ExitCode == 0 ? UiTheme.Green : UiTheme.Red);
+                CheckExoModuleAsync();
+            };
+
+            disconnectBtn.Click += async delegate
+            {
+                SetBusy(true);
+                AppendLog("Disconnecting...");
+                string disc = ConnectionSettings.BuildDisconnect();
+                LogCommand("Disconnect - PowerShell", disc);
+                var r = await RunPowerShellCaptureAsync(disc);
+                SetBusy(false);
+                AppendLog(r.Output);
+                SetFooter("Disconnected", UiTheme.Muted);
+                SetConnectedAs(null);
+            };
+
+            applyMode();
+            card.Controls.Add(buttons);
+            card.Controls.Add(fields);
+            card.Controls.Add(logCmdRow);
+            card.Controls.Add(connectedRow);
+            card.Controls.Add(moduleRow);
+            card.Controls.Add(modeGroup);
+            card.Controls.Add(head);
+            page.Controls.Add(card);
+            return page;
+        }
+
+        private async void CheckExoModuleAsync()
+        {
+            if (_exoModuleStatus == null) return;
+            _exoModuleStatus.Text = "checking...";
+            _exoModuleStatus.ForeColor = UiTheme.Orange;
+            var r = await RunPowerShellCaptureAsync(ConnectionSettings.BuildModuleCheck());
+            string outp = (r.Output ?? "").Trim();
+            if (outp.IndexOf("INSTALLED", StringComparison.OrdinalIgnoreCase) >= 0 && outp.IndexOf("NOTINSTALLED", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                string ver = outp.Replace("INSTALLED", "").Trim();
+                _exoModuleStatus.Text = "installed" + (ver.Length > 0 ? " (v" + ver + ")" : "");
+                _exoModuleStatus.ForeColor = UiTheme.Green;
+            }
+            else
+            {
+                _exoModuleStatus.Text = "not installed - use \"Install EXO module\"";
+                _exoModuleStatus.ForeColor = UiTheme.Red;
+            }
+        }
+
+        private void ApplyScopeDefaults(bool online)
+        {
+            foreach (var kv in _sectionUi)
+            {
+                SectionUi ui = kv.Value;
+                if (ui.Section == null || !ui.Section.ScopeAwareDefaults) continue;
+                foreach (var g in ui.Checks)
+                    foreach (CheckBox cb in g.Value)
+                    {
+                        var opt = cb.Tag as AuditOption;
+                        if (opt != null) cb.Checked = online ? opt.DefOnline : opt.DefOnPrem;
+                    }
+            }
+        }
+
+        private async Task RefreshConnectedAsAsync()
+        {
+            SetConnectedAs("checking...");
+            var r = await RunPowerShellCaptureAsync(ConnectionSettings.BuildConnectedAsCheck());
+            string outp = (r.Output ?? "").Trim();
+            int idx = outp.IndexOf("CONNECTEDAS", StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0)
+            {
+                string who = outp.Substring(idx + "CONNECTEDAS".Length).Trim();
+                int nl = who.IndexOfAny(new char[] { '\r', '\n' });
+                if (nl >= 0) who = who.Substring(0, nl).Trim();
+                SetConnectedAs(who.Length > 0 ? who : "connected");
+            }
+            else SetConnectedAs(null);
+        }
+
+        private void SetConnectedAs(string who)
+        {
+            if (_connectedAs == null) return;
+            if (string.IsNullOrEmpty(who)) { _connectedAs.Text = "not connected"; _connectedAs.ForeColor = UiTheme.Muted; }
+            else if (who == "checking...") { _connectedAs.Text = who; _connectedAs.ForeColor = UiTheme.Orange; }
+            else { _connectedAs.Text = who; _connectedAs.ForeColor = UiTheme.Green; }
+        }
+
+        private Control BuildSectionPage(AuditSection section)
+        {
+            var ui = new SectionUi { Section = section };
+            _sectionUi[section.Id] = ui;
+
+            var page = new Panel { BackColor = UiTheme.Window, Padding = new Padding(0, 0, 0, 10) };
+
+            var leftColumn = new Panel { Dock = DockStyle.Left, Width = 450, BackColor = UiTheme.Window, Padding = new Padding(0, 0, 8, 0) };
+            var rightColumn = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Window, Padding = new Padding(8, 0, 0, 0) };
+
+            var optionsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(16, 14, 16, 14), AutoScroll = true };
+
+            var headerRow = new Panel { Dock = DockStyle.Top, Height = 26, BackColor = UiTheme.Surface };
+            var scopeBadge = new Label { Text = ScopeText(section.Scope), Dock = DockStyle.Left, Width = 240, ForeColor = UiTheme.Orange, Font = new Font("Segoe UI Semibold", 8F), TextAlign = ContentAlignment.MiddleLeft };
+            var selectAllBtn = new ModernButton { Text = "Select all", Dock = DockStyle.Right, Width = 110, Height = 24, Padding = new Padding(0) };
+            selectAllBtn.Click += delegate
+            {
+                bool anyUnchecked = false;
+                foreach (var kv in ui.Checks)
+                    foreach (CheckBox cb in kv.Value)
+                        if (!cb.Checked) { anyUnchecked = true; break; }
+                bool target = anyUnchecked;
+                foreach (var kv in ui.Checks)
+                    foreach (CheckBox cb in kv.Value)
+                        cb.Checked = target;
+                selectAllBtn.Text = target ? "Unselect all" : "Select all";
+            };
+            headerRow.Controls.Add(selectAllBtn);
+            headerRow.Controls.Add(scopeBadge);
+
+            var groupsHost = new Panel { Dock = DockStyle.Top, BackColor = UiTheme.Surface, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
+            var built = new List<Control>();
+            foreach (AuditOptionGroup grp in section.Groups)
+                built.Add(BuildOptionGroup(ui, grp));
+            for (int i = built.Count - 1; i >= 0; i--) groupsHost.Controls.Add(built[i]);
+
+            optionsCard.Controls.Add(groupsHost);
+            optionsCard.Controls.Add(headerRow);
+
+            var outputRow = NewLabeledRow("Output CSV", null);
+            ui.OutputPath = (TextBox)outputRow.Tag;
+            ui.OutputPath.Text = Path.Combine(DefaultExportDir(), section.DefaultFileName);
+            var browse = new ModernButton { Text = "Browse", Dock = DockStyle.Right, Width = 88, Height = 34, Padding = new Padding(0) };
+            browse.Click += delegate
+            {
+                using (var dlg = new SaveFileDialog { Filter = "CSV file (*.csv)|*.csv", DefaultExt = "csv", AddExtension = true, FileName = section.DefaultFileName })
+                    if (dlg.ShowDialog(this) == DialogResult.OK) ui.OutputPath.Text = dlg.FileName;
+            };
+            outputRow.Controls.Add(browse);
+            outputRow.Dock = DockStyle.Bottom;
+
+            ui.RunButton = new ModernButton { Text = "RUN AUDIT", Dock = DockStyle.Bottom, Height = 42 };
+            ui.RunButton.NormalColor = UiTheme.Blue; ui.RunButton.BackColor = UiTheme.Blue; ui.RunButton.ForeColor = Color.White;
+            ui.RunButton.Click += async delegate { await RunSectionAsync(ui); };
+
+            leftColumn.Controls.Add(optionsCard);
+            leftColumn.Controls.Add(outputRow);
+            leftColumn.Controls.Add(ui.RunButton);
+
+            var resultsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(12, 10, 12, 12) };
+            var rHead = new Panel { Dock = DockStyle.Top, Height = 30, BackColor = UiTheme.Surface };
+            var rTitle = new Label { Text = "Results preview", Dock = DockStyle.Left, Width = 160, ForeColor = UiTheme.Text, Font = new Font("Segoe UI Semibold", 9.5F), TextAlign = ContentAlignment.MiddleLeft };
+            ui.OpenButton = new ModernButton { Text = "Open CSV", Dock = DockStyle.Right, Width = 96, Height = 26, Padding = new Padding(0), Enabled = false };
+            ui.OpenButton.Click += delegate { if (!string.IsNullOrEmpty(ui.LastCsv) && File.Exists(ui.LastCsv)) OpenPath(ui.LastCsv); };
+            rHead.Controls.Add(ui.OpenButton);
+            rHead.Controls.Add(rTitle);
+
+            ui.ResultInfo = new Label { Text = "No results yet.", Dock = DockStyle.Top, Height = 22, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.3F) };
+
+            ui.Grid = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                BackgroundColor = Color.FromArgb(6, 15, 26),
+                BorderStyle = BorderStyle.None,
+                ReadOnly = true,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                RowHeadersVisible = false,
+                EnableHeadersVisualStyles = false,
+                GridColor = UiTheme.Border,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+            };
+            ui.Grid.ColumnHeadersDefaultCellStyle.BackColor = UiTheme.Surface2;
+            ui.Grid.ColumnHeadersDefaultCellStyle.ForeColor = UiTheme.Text;
+            ui.Grid.DefaultCellStyle.BackColor = Color.FromArgb(8, 18, 30);
+            ui.Grid.DefaultCellStyle.ForeColor = UiTheme.Text;
+            ui.Grid.DefaultCellStyle.SelectionBackColor = UiTheme.Blue;
+            ui.Grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            // Reveal full cell content (long SMTP addresses, permission lists, etc.) on hover.
+            ui.Grid.ShowCellToolTips = true;
+
+            resultsCard.Controls.Add(ui.Grid);
+            resultsCard.Controls.Add(ui.ResultInfo);
+            resultsCard.Controls.Add(rHead);
+            rightColumn.Controls.Add(resultsCard);
+
+            page.Controls.Add(rightColumn);
+            page.Controls.Add(leftColumn);
+            return page;
+        }
+
+        private Control BuildOptionGroup(SectionUi ui, AuditOptionGroup grp)
+        {
+            var card = new RoundedPanel { Dock = DockStyle.Top, BackColor = UiTheme.Surface2, CornerRadius = 6, Padding = new Padding(12, 8, 12, 10), Margin = new Padding(0, 0, 0, 8), AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
+
+            var title = new Label { Text = grp.Title, Dock = DockStyle.Top, Height = 22, ForeColor = UiTheme.Text, Font = new Font("Segoe UI Semibold", 9.5F) };
+            Label hint = null;
+            if (!string.IsNullOrEmpty(grp.Hint))
+                hint = new Label { Text = grp.Hint, Dock = DockStyle.Top, Height = 18, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 7.8F) };
+
+            int cols = Math.Max(1, grp.Columns);
+            int rows = (grp.Options.Count + cols - 1) / cols;
+            var table = new TableLayoutPanel
+            {
+                Dock = DockStyle.Top,
+                ColumnCount = cols,
+                RowCount = rows,
+                BackColor = UiTheme.Surface2,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(0, 4, 0, 0)
+            };
+            for (int c = 0; c < cols; c++) table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F / cols));
+
+            if (grp.Mode == GroupMode.MultiCheck)
+            {
+                var list = new List<CheckBox>();
+                foreach (AuditOption opt in grp.Options)
+                {
+                    bool initChecked = ui.Section.ScopeAwareDefaults ? (ConnectionSettings.IsOnline ? opt.DefOnline : opt.DefOnPrem) : opt.DefaultChecked;
+                    var cb = new CheckBox { Text = opt.Label, Checked = initChecked, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.6F), Margin = new Padding(2, 3, 8, 3) };
+                    cb.Tag = opt;
+                    _optionTip.SetToolTip(cb, opt.Label);
+                    list.Add(cb);
+                    table.Controls.Add(cb);
+                }
+                ui.Checks[grp.Key] = list;
+            }
+            else
+            {
+                var list = new List<RadioButton>();
+                bool anyChecked = false;
+                foreach (AuditOption opt in grp.Options)
+                {
+                    var rb = new RadioButton { Text = opt.Label, Checked = opt.DefaultChecked, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.6F), Margin = new Padding(2, 3, 8, 3) };
+                    if (opt.DefaultChecked) anyChecked = true;
+                    rb.Tag = opt;
+                    _optionTip.SetToolTip(rb, opt.Label);
+                    list.Add(rb);
+                    table.Controls.Add(rb);
+                }
+                if (!anyChecked && list.Count > 0) list[0].Checked = true;
+                ui.Radios[grp.Key] = list;
+            }
+
+            card.Controls.Add(table);
+            if (hint != null) card.Controls.Add(hint);
+            card.Controls.Add(title);
+            return card;
+        }
+
+        private async Task RunSectionAsync(SectionUi ui)
+        {
+            AuditSection section = ui.Section;
+            string csv = ui.OutputPath.Text.Trim();
+            if (string.IsNullOrEmpty(csv)) { Warn("Choose an output CSV path first."); return; }
+
+            var selection = new AuditSelection();
+            foreach (var kv in ui.Checks)
+            {
+                var vals = new List<string>();
+                foreach (CheckBox cb in kv.Value) if (cb.Checked) vals.Add(((AuditOption)cb.Tag).Value);
+                selection.Set(kv.Key, vals);
+            }
+            foreach (var kv in ui.Radios)
+            {
+                var vals = new List<string>();
+                foreach (RadioButton rb in kv.Value) if (rb.Checked) { vals.Add(((AuditOption)rb.Tag).Value); break; }
+                selection.Set(kv.Key, vals);
+            }
+
+            string body;
+            try { body = section.BuildScript(selection, new ScriptContext(csv)); }
+            catch (Exception ex) { Warn("Could not build the script: " + ex.Message); return; }
+
+            string full = ConnectionSettings.BuildPrelude() + Environment.NewLine + body;
+
+            ui.RunButton.Enabled = false;
+            SetBusy(true);
+            SetFooter("Running " + section.NavTitle + "...", UiTheme.Orange);
+            AppendLog("=== " + section.Title + " ===");
+            AppendLog(ConnectionSettings.Summary());
+            LogCommand(section.NavTitle + " - PowerShell", body);
+
+            try { Directory.CreateDirectory(Path.GetDirectoryName(csv)); } catch { }
+
+            var result = await RunPowerShellScriptAsync(full);
+
+            if (result.ExitCode == 0 && File.Exists(csv))
+            {
+                ui.LastCsv = csv;
+                ui.OpenButton.Enabled = true;
+                int count = LoadCsvIntoGrid(ui.Grid, csv, 200);
+                ui.ResultInfo.Text = "Exported to " + Path.GetFileName(csv) + "  -  " + count + " row(s) previewed.";
+                ui.ResultInfo.ForeColor = UiTheme.Green;
+                SetFooter(section.NavTitle + " done", UiTheme.Green);
+                if (_connectedAs != null && _connectedAs.Text == "not connected") await RefreshConnectedAsAsync();
+            }
+            else
+            {
+                ui.ResultInfo.Text = "Run failed - see the activity log.";
+                ui.ResultInfo.ForeColor = UiTheme.Red;
+                SetFooter(section.NavTitle + " failed", UiTheme.Red);
+            }
+
+            SetBusy(false);
+            ui.RunButton.Enabled = true;
+        }
+
+        private Task<PsResult> RunPowerShellCaptureAsync(string command)
+        {
+            return Task.Run(delegate { return _ps.Execute(command, 300000, null); });
+        }
+
+        private Task<PsResult> RunPowerShellStreamingAsync(string script, int timeoutMs)
+        {
+            Action<string> live = delegate (string line) { AppendLog(line); };
+            return Task.Run(delegate { return _ps.Execute(script, timeoutMs, live); });
+        }
+
+        private Task<PsResult> RunPowerShellScriptAsync(string script)
+        {
+            return RunPowerShellStreamingAsync(script, 1800000);
+        }
+
+        private void CloseSession()
+        {
+            try
+            {
+                if (_ps.IsAlive)
+                {
+                    AppendLog("Closing Exchange session...");
+                    _ps.Execute(ConnectionSettings.BuildDisconnect(), 15000, null);
+                }
+            }
+            catch { }
+            finally { _ps.Dispose(); }
+        }
+
+        private int LoadCsvIntoGrid(DataGridView grid, string path, int maxRows)
+        {
+            grid.Columns.Clear();
+            grid.Rows.Clear();
+            int dataRows = 0;
+            try
+            {
+                using (var reader = new StreamReader(path, Encoding.UTF8, true))
+                {
+                    string headerLine = reader.ReadLine();
+                    if (headerLine == null) return 0;
+                    string[] headers = ParseCsvLine(headerLine);
+                    foreach (string h in headers)
+                        grid.Columns.Add("c" + grid.Columns.Count, h);
+                    string line;
+                    while ((line = reader.ReadLine()) != null && dataRows < maxRows)
+                    {
+                        string[] cells = ParseCsvLine(line);
+                        var row = new object[headers.Length];
+                        for (int i = 0; i < headers.Length; i++) row[i] = i < cells.Length ? cells[i] : "";
+                        grid.Rows.Add(row);
+                        dataRows++;
+                    }
+                }
+                foreach (DataGridViewColumn c in grid.Columns) c.Width = 150;
+            }
+            catch (Exception ex) { AppendLog("[preview] " + ex.Message); }
+            return dataRows;
+        }
+
+        // CSV delimiter is ';' (see ScriptContext.ExportCsv).
+        private static string[] ParseCsvLine(string line)
+        {
+            var result = new List<string>();
+            var sb = new StringBuilder();
+            bool inQuotes = false;
+            for (int i = 0; i < line.Length; i++)
+            {
+                char ch = line[i];
+                if (inQuotes)
+                {
+                    if (ch == '"')
+                    {
+                        if (i + 1 < line.Length && line[i + 1] == '"') { sb.Append('"'); i++; }
+                        else inQuotes = false;
+                    }
+                    else sb.Append(ch);
+                }
+                else
+                {
+                    if (ch == '"') inQuotes = true;
+                    else if (ch == ';') { result.Add(sb.ToString()); sb.Length = 0; }
+                    else sb.Append(ch);
+                }
+            }
+            result.Add(sb.ToString());
+            return result.ToArray();
+        }
+
+        private static Panel NewSectionHeader(string iconKey, string title, string subtitle)
+        {
+            var panel = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = UiTheme.Surface };
+            var icon = new PictureBox { Image = UiAssets.Render(iconKey, 22), Dock = DockStyle.Left, Width = 44, BackColor = UiTheme.Surface, SizeMode = PictureBoxSizeMode.CenterImage };
+            var titleLabel = new Label { Text = title, Dock = DockStyle.Top, Height = 28, ForeColor = UiTheme.Text, Font = new Font("Segoe UI Semibold", 12F), TextAlign = ContentAlignment.BottomLeft };
+            var subLabel = new Label { Text = subtitle, Dock = DockStyle.Fill, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.2F), TextAlign = ContentAlignment.TopLeft };
+            panel.Controls.Add(subLabel);
+            panel.Controls.Add(titleLabel);
+            panel.Controls.Add(icon);
+            return panel;
+        }
+
+        private static RadioButton NewRadio(string text, bool check)
+        {
+            return new RadioButton { Text = text, Checked = check, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
+        }
+
+        private static TextBox NewField()
+        {
+            return new TextBox { BorderStyle = BorderStyle.FixedSingle, BackColor = UiTheme.FieldBack, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 9F) };
+        }
+
+        private static Panel NewLabeledRow(string caption, TextBox box)
+        {
+            var row = new Panel { Dock = DockStyle.Top, Height = 48, BackColor = UiTheme.Surface };
+            var label = new Label { Text = caption, Dock = DockStyle.Left, Width = 150, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
+            if (box == null) box = NewField();
+            var host = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 9, 8, 9), BackColor = row.BackColor };
+            box.Dock = DockStyle.Fill;
+            host.Controls.Add(box);
+            row.Controls.Add(host);
+            row.Controls.Add(label);
+            row.Tag = box;
+            return row;
+        }
+
+        private static string ScopeText(AuditScope scope)
+        {
+            switch (scope)
+            {
+                case AuditScope.ExchangeOnline: return "SCOPE: EXCHANGE ONLINE";
+                case AuditScope.OnPremises: return "SCOPE: ON-PREMISES";
+                default: return "SCOPE: ONLINE OR ON-PREMISES";
+            }
+        }
+
+        private static string DefaultExportDir()
+        {
+            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ExchangeAudit");
+            try { Directory.CreateDirectory(dir); } catch { }
+            return dir;
+        }
+
+        private void Warn(string message)
+        {
+            AppendLog("[!] " + message);
+            MessageBox.Show(this, message, "Exchange Audit Tool", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private static void OpenPath(string path)
+        {
+            try { Process.Start(new ProcessStartInfo(path) { UseShellExecute = true }); } catch { }
+        }
+    }
+}

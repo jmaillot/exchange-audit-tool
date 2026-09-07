@@ -1,0 +1,36 @@
+# Build output — produced by Build-ExchangeAuditTool.ps1, not needed to build
+dist/
+*.exe
+*.pdb
+*.log
+ExchangeAuditTool.startup.log
+ExchangeAuditTool.activity.log
+
+# PowerShell temp scripts created at runtime by PowerShellSession.cs
+ExAudit-*.ps1
+
+# Exported audit CSVs (default output is %USERPROFILE%\Documents\ExchangeAudit\, but keep repo clean if changed)
+*.csv
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Visual Studio / editors (no .csproj/.sln in this repo, direct csc build)
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# JetBrains
+.idea/
+
+# graphify knowledge-graph output
+graphify-out/
+
+# Temp / backup
+*.tmp
+*.bak
+*~
