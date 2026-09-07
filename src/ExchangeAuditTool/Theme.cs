@@ -19,6 +19,7 @@ namespace ExchangeAuditTool
         public static readonly Color BlueHover = Color.FromArgb(60, 125, 246);
         public static readonly Color Text = Color.FromArgb(230, 235, 243);
         public static readonly Color Muted = Color.FromArgb(139, 153, 171);
+        public static readonly Color NavText = Color.FromArgb(203, 215, 230);
         public static readonly Color Green = Color.FromArgb(49, 211, 94);
         public static readonly Color Orange = Color.FromArgb(250, 173, 65);
         public static readonly Color Red = Color.FromArgb(248, 113, 113);
@@ -121,6 +122,26 @@ namespace ExchangeAuditTool
         private static readonly Color Accent = Color.FromArgb(66, 138, 247);
 
         public static Bitmap Render(string key, int size)
+        {
+            return Render(key, size, false);
+        }
+
+        // White variant for selected nav buttons: recolors the standard glyph
+        // to white (alpha preserved). Keeps one drawing implementation.
+        public static Bitmap Render(string key, int size, bool white)
+        {
+            Bitmap bmp = RenderCore(key, size);
+            if (!white) return bmp;
+            for (int y = 0; y < bmp.Height; y++)
+                for (int x = 0; x < bmp.Width; x++)
+                {
+                    Color p = bmp.GetPixel(x, y);
+                    if (p.A > 0) bmp.SetPixel(x, y, Color.FromArgb(p.A, 255, 255, 255));
+                }
+            return bmp;
+        }
+
+        private static Bitmap RenderCore(string key, int size)
         {
             var bmp = new Bitmap(size, size, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
             using (Graphics g = Graphics.FromImage(bmp))

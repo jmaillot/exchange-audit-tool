@@ -383,7 +383,7 @@ namespace ExchangeAuditTool
                 foreach (var kv in ui.Checks)
                     foreach (CheckBox cb in kv.Value)
                         cb.Checked = target;
-                selectAllBtn.Text = target ? "Unselect all" : "Select all";
+                selectAllBtn.Text = target ? "Deselect all" : "Select all";
             };
             headerRow.Controls.Add(selectAllBtn);
             headerRow.Controls.Add(scopeBadge);

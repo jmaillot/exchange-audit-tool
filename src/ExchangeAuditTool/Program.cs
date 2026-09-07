@@ -278,7 +278,7 @@ namespace ExchangeAuditTool
 
         private Panel BuildSidebar()
         {
-            var sidebar = new Panel { Dock = DockStyle.Left, Width = 244, BackColor = UiTheme.Sidebar, Padding = new Padding(12) };
+            var sidebar = new Panel { Dock = DockStyle.Left, Width = 260, BackColor = UiTheme.Sidebar, Padding = new Padding(12) };
 
             Image logo = BrandAssets.Logo();
             var brand = new Panel { Dock = DockStyle.Top, Height = logo != null ? 138 : 64, BackColor = UiTheme.Sidebar };
@@ -379,12 +379,12 @@ namespace ExchangeAuditTool
         {
             var btn = new Button
             {
-                Size = new Size(214, 22),
+                Size = new Size(230, 24),
                 FlatStyle = FlatStyle.Flat,
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Color.FromArgb(66, 138, 247),
                 BackColor = UiTheme.Sidebar,
-                Font = new Font("Segoe UI Semibold", 8F),
+                Font = new Font("Segoe UI Semibold", 8.5F),
                 Cursor = cat.Collapsible ? Cursors.Hand : Cursors.Default,
                 TabStop = cat.Collapsible,
                 UseMnemonic = false
@@ -420,7 +420,7 @@ namespace ExchangeAuditTool
                     cat.Header.Location = new Point(4, y);
                     cat.Header.Text = CategoryHeaderText(cat);
                 }
-                y += 24;
+                y += 26;
 
                 foreach (Button b in cat.Buttons)
                 {
@@ -429,7 +429,7 @@ namespace ExchangeAuditTool
                     if (cat.Expanded)
                     {
                         b.Location = new Point(8, y);
-                        y += 34;
+                        y += 38;
                     }
                 }
             }
@@ -442,18 +442,19 @@ namespace ExchangeAuditTool
             {
                 Text = "  " + text,
                 Location = new Point(8, top),
-                Size = new Size(200, 32),
+                Size = new Size(212, 36),
                 FlatStyle = FlatStyle.Flat,
                 TextAlign = ContentAlignment.MiddleLeft,
                 ImageAlign = ContentAlignment.MiddleLeft,
                 TextImageRelation = TextImageRelation.ImageBeforeText,
-                Image = UiAssets.Render(iconKey, 16),
-                Padding = new Padding(10, 0, 0, 0),
-                Font = new Font("Segoe UI Semibold", 8.8F),
+                Image = UiAssets.Render(iconKey, 18),
+                Padding = new Padding(12, 0, 0, 0),
+                Font = new Font("Segoe UI Semibold", 9.5F),
                 Cursor = Cursors.Hand,
                 BackColor = UiTheme.Sidebar,
-                ForeColor = UiTheme.Muted,
-                TabStop = true
+                ForeColor = UiTheme.NavText,
+                TabStop = true,
+                Tag = iconKey
             };
             b.FlatAppearance.BorderSize = 0;
             return b;
@@ -551,8 +552,15 @@ namespace ExchangeAuditTool
         private static void StyleNav(Button b, bool active)
         {
             b.BackColor = active ? UiTheme.Blue : UiTheme.Sidebar;
-            b.ForeColor = active ? Color.White : UiTheme.Muted;
+            b.ForeColor = active ? Color.White : UiTheme.NavText;
             b.FlatAppearance.MouseOverBackColor = active ? UiTheme.BlueHover : Color.FromArgb(17, 34, 53);
+            string key = b.Tag as string;
+            if (!string.IsNullOrEmpty(key))
+            {
+                Image old = b.Image;
+                b.Image = UiAssets.Render(key, 18, active);
+                if (old != null) old.Dispose();
+            }
         }
 
         private void ApplyRoundedRegion()
