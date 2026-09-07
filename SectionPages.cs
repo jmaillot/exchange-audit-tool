@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -31,6 +32,7 @@ namespace ExchangeAuditTool
         private void LogCommand(string title, string script)
         {
             if (!_logCommands || string.IsNullOrEmpty(script)) return;
+            script = RedactSecrets(script);
             AppendLog("---- " + title + " ----");
             foreach (string raw in script.Replace("\r", "").Split('\n'))
             {
@@ -39,6 +41,18 @@ namespace ExchangeAuditTool
                 AppendLog("PS> " + line);
             }
             AppendLog("--------");
+        }
+
+        private static string RedactSecrets(string script)
+        {
+            if (string.IsNullOrEmpty(script)) return script;
+            string redacted = script;
+            redacted = Regex.Replace(redacted, "(-UserPrincipalName\\s+)(('[^']*')|(\"[^\"]*\")|(\\S+))", "$1***", RegexOptions.IgnoreCase);
+            redacted = Regex.Replace(redacted, "(-AppId\\s+)(('[^']*')|(\"[^\"]*\")|(\\S+))", "$1***", RegexOptions.IgnoreCase);
+            redacted = Regex.Replace(redacted, "(-Organization\\s+)(('[^']*')|(\"[^\"]*\")|(\\S+))", "$1***", RegexOptions.IgnoreCase);
+            redacted = Regex.Replace(redacted, "(-CertificateThumbprint\\s+)(('[^']*')|(\"[^\"]*\")|(\\S+))", "$1***", RegexOptions.IgnoreCase);
+            redacted = Regex.Replace(redacted, "(\\$uri\\s*=\\s*)(('[^']*')|(\"[^\"]*\")|(\\S+))", "$1'***'", RegexOptions.IgnoreCase);
+            return redacted;
         }
 
         private sealed class SectionUi
@@ -512,34 +526,63 @@ namespace ExchangeAuditTool
 
             ui.RunButton.Enabled = false;
             SetBusy(true);
-            SetFooter("Running " + section.NavTitle + "...", UiTheme.Orange);
-            AppendLog("=== " + section.Title + " ===");
-            AppendLog(ConnectionSettings.Summary());
-            LogCommand(section.NavTitle + " - PowerShell", body);
-
-            try { Directory.CreateDirectory(Path.GetDirectoryName(csv)); } catch { }
-
-            var result = await RunPowerShellScriptAsync(full);
-
-            if (result.ExitCode == 0 && File.Exists(csv))
+            try
             {
-                ui.LastCsv = csv;
-                ui.OpenButton.Enabled = true;
-                int count = LoadCsvIntoGrid(ui.Grid, csv, 200);
-                ui.ResultInfo.Text = "Exported to " + Path.GetFileName(csv) + "  -  " + count + " row(s) previewed.";
-                ui.ResultInfo.ForeColor = UiTheme.Green;
-                SetFooter(section.NavTitle + " done", UiTheme.Green);
-                if (_connectedAs != null && _connectedAs.Text == "not connected") await RefreshConnectedAsAsync();
-            }
-            else
-            {
-                ui.ResultInfo.Text = "Run failed - see the activity log.";
-                ui.ResultInfo.ForeColor = UiTheme.Red;
-                SetFooter(section.NavTitle + " failed", UiTheme.Red);
-            }
+                SetFooter("Running " + section.NavTitle + "...", UiTheme.Orange);
+                AppendLog("=== " + section.Title + " ===");
+                AppendLog(ConnectionSettings.Summary());
+                LogCommand(section.NavTitle + " - PowerShell", body);
 
-            SetBusy(false);
-            ui.RunButton.Enabled = true;
+                try
+                {
+                    string dir = Path.GetDirectoryName(csv);
+                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                }
+                catch { }
+                try { if (File.Exists(csv)) File.Delete(csv); } catch { }
+
+                var result = await RunPowerShellScriptAsync(full);
+
+                if (result.ExitCode == 0 && File.Exists(csv))
+                {
+                    ui.LastCsv = csv;
+                    ui.OpenButton.Enabled = true;
+                    int previewed = LoadCsvIntoGrid(ui.Grid, csv, 200);
+                    int total = CountCsvDataRows(csv);
+                    if (total > 200)
+                        ui.ResultInfo.Text = "Exported " + total + " rows to " + Path.GetFileName(csv) + " (previewing first 200).";
+                    else
+                        ui.ResultInfo.Text = "Exported to " + Path.GetFileName(csv) + "  -  " + previewed + " row(s) previewed.";
+                    ui.ResultInfo.ForeColor = UiTheme.Green;
+                    SetFooter(section.NavTitle + " done", UiTheme.Green);
+                    if (_connectedAs != null && _connectedAs.Text == "not connected") await RefreshConnectedAsAsync();
+                }
+                else
+                {
+                    ui.ResultInfo.Text = "Run failed - see the activity log.";
+                    ui.ResultInfo.ForeColor = UiTheme.Red;
+                    SetFooter(section.NavTitle + " failed", UiTheme.Red);
+                }
+            }
+            finally
+            {
+                SetBusy(false);
+                ui.RunButton.Enabled = true;
+            }
+        }
+
+        private static int CountCsvDataRows(string path)
+        {
+            try
+            {
+                int lines = 0;
+                using (var reader = new StreamReader(path, Encoding.UTF8, true))
+                {
+                    while (reader.ReadLine() != null) lines++;
+                }
+                return Math.Max(0, lines - 1);
+            }
+            catch { return 0; }
         }
 
         private Task<PsResult> RunPowerShellCaptureAsync(string command)

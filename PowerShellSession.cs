@@ -10,6 +10,7 @@ namespace ExchangeAuditTool
     {
         private Process _proc;
         private readonly object _sync = new object();
+        private readonly SemaphoreSlim _gate = new SemaphoreSlim(1, 1);
         private StringBuilder _capture;
         private string _endMarker;
         private bool _hadError;
@@ -49,12 +50,12 @@ namespace ExchangeAuditTool
             lock (_sync)
             {
                 if (_capture == null) return;
-                if (_endMarker != null && e.Data.Contains(_endMarker))
+                if (_endMarker != null && e.Data.Trim().Equals(_endMarker, StringComparison.Ordinal))
                 {
                     if (_done != null) _done.Set();
                     return;
                 }
-                if (e.Data.Contains("<<<EAT_ERROR>>>"))
+                if (e.Data.TrimStart().StartsWith("<<<EAT_ERROR>>>", StringComparison.Ordinal))
                 {
                     _hadError = true;
                     string msg = e.Data.Replace("<<<EAT_ERROR>>>", "ERROR:").Trim();
@@ -69,58 +70,74 @@ namespace ExchangeAuditTool
 
         public PsResult Execute(string script, int timeoutMs, Action<string> onLine)
         {
-            if (!IsAlive) Start();
-
-            string marker = "<<<EAT_END_" + Guid.NewGuid().ToString("N") + ">>>";
-            string tempFile = Path.Combine(Path.GetTempPath(), "ExAudit-" + Guid.NewGuid().ToString("N") + ".ps1");
-
-            var wrapped = new StringBuilder();
-            wrapped.AppendLine("$ErrorActionPreference = 'Stop'");
-            wrapped.AppendLine("try {");
-            wrapped.AppendLine(script);
-            wrapped.AppendLine("} catch { Write-Host ('<<<EAT_ERROR>>> ' + $_.Exception.Message) }");
-
+            _gate.Wait();
             try
             {
-                File.WriteAllText(tempFile, wrapped.ToString(), new UTF8Encoding(true));
+                if (!IsAlive) Start();
 
-                lock (_sync)
+                string marker = "<<<EAT_END_" + Guid.NewGuid().ToString("N") + ">>>";
+                string tempFile = Path.Combine(Path.GetTempPath(), "ExAudit-" + Guid.NewGuid().ToString("N") + ".ps1");
+
+                var wrapped = new StringBuilder();
+                wrapped.AppendLine("$ErrorActionPreference = 'Stop'");
+                wrapped.AppendLine("try {");
+                wrapped.AppendLine(script);
+                wrapped.AppendLine("} catch { Write-Host ('<<<EAT_ERROR>>> ' + $_.Exception.Message) }");
+
+                try
                 {
-                    _capture = new StringBuilder();
-                    _endMarker = marker;
-                    _hadError = false;
-                    _done = new ManualResetEvent(false);
-                    _onLine = onLine;
+                    File.WriteAllText(tempFile, wrapped.ToString(), new UTF8Encoding(true));
+
+                    using (var done = new ManualResetEvent(false))
+                    {
+                        lock (_sync)
+                        {
+                            _capture = new StringBuilder();
+                            _endMarker = marker;
+                            _hadError = false;
+                            _done = done;
+                            _onLine = onLine;
+                        }
+
+                        _proc.StandardInput.WriteLine(". '" + tempFile.Replace("'", "''") + "'; Write-Host '" + marker + "'");
+                        _proc.StandardInput.Flush();
+
+                        bool finished = done.WaitOne(timeoutMs);
+
+                        string output;
+                        bool error;
+                        lock (_sync)
+                        {
+                            output = _capture != null ? _capture.ToString().Trim() : "";
+                            error = _hadError;
+                            _capture = null;
+                            _endMarker = null;
+                            _onLine = null;
+                            _done = null;
+                        }
+
+                        if (!finished)
+                        {
+                            try { Dispose(); } catch { }
+                            try { Start(); } catch { }
+                            return new PsResult(-1, output + Environment.NewLine + "[timed out waiting for the command to finish]");
+                        }
+
+                        return new PsResult(error ? 1 : 0, output);
+                    }
                 }
-
-                _proc.StandardInput.WriteLine(". '" + tempFile.Replace("'", "''") + "'; Write-Host '" + marker + "'");
-                _proc.StandardInput.Flush();
-
-                bool finished = _done.WaitOne(timeoutMs);
-
-                string output;
-                bool error;
-                lock (_sync)
+                catch (Exception ex)
                 {
-                    output = _capture != null ? _capture.ToString().Trim() : "";
-                    error = _hadError;
-                    _capture = null;
-                    _endMarker = null;
-                    _onLine = null;
+                    return new PsResult(-1, ex.Message);
                 }
-
-                if (!finished)
-                    return new PsResult(-1, output + Environment.NewLine + "[timed out waiting for the command to finish]");
-
-                return new PsResult(error ? 1 : 0, output);
-            }
-            catch (Exception ex)
-            {
-                return new PsResult(-1, ex.Message);
+                finally
+                {
+                    try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+                }
             }
             finally
             {
-                try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+                try { _gate.Release(); } catch { }
             }
         }
 

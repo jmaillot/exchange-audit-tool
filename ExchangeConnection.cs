@@ -81,15 +81,25 @@ namespace ExchangeAuditTool
             }
             else if (Mode == ConnectionMode.OnPremisesRemote)
             {
+                bool basic = RemoteAuth == RemoteAuthMode.Basic;
+                bool forcedHttps = false;
+                if (basic && !RemoteUseHttps)
+                {
+                    RemoteUseHttps = true;
+                    forcedHttps = true;
+                }
                 string scheme = RemoteUseHttps ? "https://" : "http://";
                 string uri = scheme + RemoteServer.Trim() + "/PowerShell/";
-                bool basic = RemoteAuth == RemoteAuthMode.Basic;
                 string authName = basic ? "Basic" : "Kerberos";
                 // Credentials are required for Basic; optional for Kerberos (current identity by default).
                 bool promptCred = basic || !string.IsNullOrEmpty(RemoteUser);
 
                 sb.AppendLine("if (-not (Get-Command Get-Mailbox -ErrorAction SilentlyContinue)) {");
                 sb.AppendLine("    Write-Host 'Opening remote PowerShell session to Exchange (" + authName + ")...'");
+                if (forcedHttps)
+                {
+                    sb.AppendLine("    Write-Host 'Basic authentication requires HTTPS; forcing HTTPS.'");
+                }
                 sb.AppendLine("    $uri = " + ScriptContext.PsLiteral(uri));
 
                 if (promptCred)
@@ -176,7 +186,7 @@ namespace ExchangeAuditTool
                 sb.AppendLine("    $org = ''");
                 sb.AppendLine("    try { $org = (Get-OrganizationConfig).Name } catch { $org = '' }");
                 sb.AppendLine("    if (Get-Command Get-Mailbox -ErrorAction SilentlyContinue) {");
-                sb.AppendLine("        Write-Host ('CONNECTEDAS ' + $who + ' @ " + RemoteServer.Trim() + " | ' + $org)");
+                sb.AppendLine("        Write-Host ('CONNECTEDAS ' + $who + ' @ ' + " + ScriptContext.PsLiteral(RemoteServer.Trim()) + " + ' | ' + $org)");
                 sb.AppendLine("    } else { Write-Host 'NOTCONNECTED' }");
                 sb.AppendLine("} catch { Write-Host 'NOTCONNECTED' }");
             }
