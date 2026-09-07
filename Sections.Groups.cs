@@ -116,7 +116,7 @@ namespace ExchangeAuditTool
             membership.Add(new AuditOption("expand", "Expand members (one row per member)", "expand", false));
             section.AddGroup(membership);
 
-            AddSizeGroup(section);
+            PsScriptHelpers.AddSizeGroup(section);
 
             section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
             {
@@ -135,7 +135,7 @@ namespace ExchangeAuditTool
                 string selectList = BuildSelectList(chosen, out needResolver);
 
                 var sb = new StringBuilder();
-                if (needResolver || sob || membershipMode == "expand") EmitResolver(sb);
+                if (needResolver || sob || membershipMode == "expand") { string getRecip = ConnectionSettings.IsOnline ? "Get-EXORecipient" : "Get-Recipient"; PsScriptHelpers.EmitResolver(sb, getRecip, false); }
 
                 sb.AppendLine("Write-Host 'Querying groups...'");
                 sb.AppendLine("$groups = @(Get-DistributionGroup -ResultSize " + resultSize + " -RecipientTypeDetails " + filterType + ")");
@@ -278,7 +278,7 @@ namespace ExchangeAuditTool
             snapshot.Add(new AuditOption("expand", "Expand current members (one row per member)", "expand", false));
             section.AddGroup(snapshot);
 
-            AddSizeGroup(section);
+            PsScriptHelpers.AddSizeGroup(section);
 
             section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
             {
@@ -297,7 +297,7 @@ namespace ExchangeAuditTool
                 string selectList = BuildSelectList(chosen, out needResolver);
 
                 var sb = new StringBuilder();
-                if (needResolver || sob || snap == "expand") EmitResolver(sb);
+                if (needResolver || sob || snap == "expand") { string getRecip = ConnectionSettings.IsOnline ? "Get-EXORecipient" : "Get-Recipient"; PsScriptHelpers.EmitResolver(sb, getRecip, false); }
 
                 sb.AppendLine("Write-Host 'Querying dynamic distribution groups...'");
                 sb.AppendLine("$groups = @(Get-DynamicDistributionGroup -ResultSize " + resultSize + ")");
@@ -460,7 +460,7 @@ namespace ExchangeAuditTool
             membership.Add(new AuditOption("expandsubscribers", "Expand subscribers (one row per subscriber)", "expandsubscribers", false));
             section.AddGroup(membership);
 
-            AddSizeGroup(section);
+            PsScriptHelpers.AddSizeGroup(section);
 
             section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
             {
@@ -487,7 +487,7 @@ namespace ExchangeAuditTool
                 else if (membershipMode == "expandsubscribers") linkType = "Subscribers";
 
                 var sb = new StringBuilder();
-                if (needResolver || sob) EmitResolver(sb);
+                if (needResolver || sob) { string getRecip = ConnectionSettings.IsOnline ? "Get-EXORecipient" : "Get-Recipient"; PsScriptHelpers.EmitResolver(sb, getRecip, false); }
 
                 sb.AppendLine("Write-Host 'Querying Microsoft 365 groups...'");
                 sb.AppendLine("$groups = @(Get-UnifiedGroup -ResultSize " + resultSize + ")");
@@ -534,15 +534,6 @@ namespace ExchangeAuditTool
             };
 
             return section;
-        }
-
-        private static void AddSizeGroup(AuditSection section)
-        {
-            var size = new AuditOptionGroup("size", "Result size", GroupMode.SingleChoice); size.Columns = 3;
-            size.Add(new AuditOption("unlimited", "Unlimited", "Unlimited", true));
-            size.Add(new AuditOption("1000", "First 1000", "1000", false));
-            size.Add(new AuditOption("100", "First 100", "100", false));
-            section.AddGroup(size);
         }
 
         private static void EmitSendAsIndex(StringBuilder sb)
@@ -605,30 +596,6 @@ namespace ExchangeAuditTool
             }
             if (exprs.Count == 0) exprs.Add("DisplayName");
             return string.Join(", ", exprs.ToArray());
-        }
-
-        private static void EmitResolver(StringBuilder sb)
-        {
-            bool online = ConnectionSettings.IsOnline;
-            string getRecip = online ? "Get-EXORecipient" : "Get-Recipient";
-            sb.AppendLine("$script:recipCache = @{}");
-            sb.AppendLine("function Resolve-Recip {");
-            sb.AppendLine("    param($values)");
-            sb.AppendLine("    $out = New-Object System.Collections.Generic.List[string]");
-            sb.AppendLine("    foreach ($v in @($values)) {");
-            sb.AppendLine("        $key = [string]$v");
-            sb.AppendLine("        if ([string]::IsNullOrEmpty($key)) { continue }");
-            sb.AppendLine("        if ($script:recipCache.ContainsKey($key)) { $smtp = $script:recipCache[$key] }");
-            sb.AppendLine("        else {");
-            sb.AppendLine("            $smtp = $key");
-            sb.AppendLine("            try { $r = " + getRecip + " -Identity $key -ErrorAction Stop; if ($r -and $r.PrimarySmtpAddress) { $smtp = [string]$r.PrimarySmtpAddress } } catch { }");
-            sb.AppendLine("            $script:recipCache[$key] = $smtp");
-            sb.AppendLine("        }");
-            sb.AppendLine("        if (-not $out.Contains($smtp)) { $out.Add($smtp) }");
-            sb.AppendLine("    }");
-            sb.AppendLine("    ($out -join ',')");
-            sb.AppendLine("}");
-            sb.AppendLine();
         }
     }
 }

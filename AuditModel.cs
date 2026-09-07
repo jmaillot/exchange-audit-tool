@@ -148,7 +148,7 @@ namespace ExchangeAuditTool
         public static void BuildAll()
         {
             Sections.Clear();
-            SectionsCatalog.RegisterMailboxSections();
+            SectionsMailboxes.RegisterMailboxSections();
             SectionsMailboxTypes.Register();
             SectionsGroups.Register();
             SectionsContacts.Register();

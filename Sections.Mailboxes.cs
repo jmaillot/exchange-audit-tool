@@ -4,7 +4,7 @@ using System.Text;
 
 namespace ExchangeAuditTool
 {
-    internal static class SectionsCatalog
+    internal static class SectionsMailboxes
     {
         public static void RegisterMailboxSections()
         {
@@ -215,11 +215,7 @@ namespace ExchangeAuditTool
             extra.Add(new AuditOption("regional", "Regional config (Language, TimeZone) - per-mailbox, slower", "regional", false));
             section.AddGroup(extra);
 
-            var size = new AuditOptionGroup("size", "Result size", GroupMode.SingleChoice); size.Columns = 3;
-            size.Add(new AuditOption("unlimited", "Unlimited", "Unlimited", true));
-            size.Add(new AuditOption("1000", "First 1000", "1000", false));
-            size.Add(new AuditOption("100", "First 100", "100", false));
-            section.AddGroup(size);
+            PsScriptHelpers.AddSizeGroup(section);
 
             section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
             {
@@ -303,43 +299,9 @@ namespace ExchangeAuditTool
 
                 var sb = new StringBuilder();
 
-                if (needResolver)
-                {
-                    sb.AppendLine("$script:recipCache = @{}");
-                    sb.AppendLine("function Resolve-Recip {");
-                    sb.AppendLine("    param($values)");
-                    sb.AppendLine("    $out = New-Object System.Collections.Generic.List[string]");
-                    sb.AppendLine("    foreach ($v in @($values)) {");
-                    sb.AppendLine("        $key = [string]$v");
-                    sb.AppendLine("        if ([string]::IsNullOrEmpty($key)) { continue }");
-                    sb.AppendLine("        if ($script:recipCache.ContainsKey($key)) { $smtp = $script:recipCache[$key] }");
-                    sb.AppendLine("        else {");
-                    sb.AppendLine("            $smtp = $key");
-                    sb.AppendLine("            try { $r = " + getRecip + " -Identity $key -ErrorAction Stop; if ($r -and $r.PrimarySmtpAddress) { $smtp = [string]$r.PrimarySmtpAddress } } catch { }");
-                    sb.AppendLine("            $script:recipCache[$key] = $smtp");
-                    sb.AppendLine("        }");
-                    sb.AppendLine("        if (-not $out.Contains($smtp)) { $out.Add($smtp) }");
-                    sb.AppendLine("    }");
-                    sb.AppendLine("    ($out -join ',')");
-                    sb.AppendLine("}");
-                    sb.AppendLine();
-                }
+                if (needResolver) PsScriptHelpers.EmitResolver(sb, getRecip, false);
 
-                if (needSize)
-                {
-                    sb.AppendLine("function Get-SizeMB {");
-                    sb.AppendLine("    param($identity)");
-                    sb.AppendLine("    try {");
-                    sb.AppendLine("        $st = " + getStats + " -Identity $identity -ErrorAction Stop");
-                    sb.AppendLine("        if ($st -and $st.TotalItemSize) {");
-                    sb.AppendLine("            $s = $st.TotalItemSize.ToString()");
-                    sb.AppendLine("            if ($s -match '\\(([\\d,]+) bytes\\)') { return [math]::Round(([double]($matches[1] -replace ',','')) / 1MB, 2) }");
-                    sb.AppendLine("        }");
-                    sb.AppendLine("    } catch { }");
-                    sb.AppendLine("    return ''");
-                    sb.AppendLine("}");
-                    sb.AppendLine();
-                }
+                if (needSize) PsScriptHelpers.EmitSizeHelper(sb, getStats);
 
                 sb.AppendLine("Write-Host 'Querying USER mailboxes...'");
                 sb.AppendLine("$mbx = @(" + getMbx + " -ResultSize " + resultSize + " -RecipientTypeDetails UserMailbox" + propsArg + ")");

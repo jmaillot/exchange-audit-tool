@@ -41,11 +41,7 @@ namespace ExchangeAuditTool
 
         private static List<string> Collect(AuditSelection sel, params string[] groupKeys)
         {
-            var chosen = new List<string>();
-            foreach (string gk in groupKeys)
-                foreach (string v in sel.Selected(gk))
-                    if (!chosen.Contains(v)) chosen.Add(v);
-            return chosen;
+            return PsScriptHelpers.Collect(sel, groupKeys);
         }
 
         // ============================================================ 1. TRANSPORT RULES
