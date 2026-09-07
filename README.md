@@ -42,18 +42,26 @@ Each section is a declarative `AuditSection` (`AuditModel.cs`): option groups re
 
 ## Build
 
-No `.csproj` / `.sln`, no NuGet. Direct `csc` invocation:
+Prerequisites: [.NET SDK](https://dotnet.microsoft.com/download) (any recent version; the app targets `net48`) on Windows for a full build, or plain .NET Framework with `csc.exe` for the fallback path.
 
 ```powershell
 .\Build-ExchangeAuditTool.ps1
-# optional: .\Build-ExchangeAuditTool.ps1 -OutputDirectory .\dist
+# optional: .\Build-ExchangeAuditTool.ps1 -OutputDirectory .\dist -Configuration Release
 ```
 
-Output: `dist/ExchangeAuditTool_<version>.exe` (single-file `winexe`, version taken from `AssemblyFileVersion` in `Program.cs`). `dist/` is git-ignored.
+This runs `dotnet publish` on `src/ExchangeAuditTool` (falls back to direct `csc` if no SDK is present).
+Developers can also work with the solution directly:
+
+```powershell
+dotnet build ExchangeAuditTool.sln -c Release
+dotnet test ExchangeAuditTool.sln -c Release
+```
+
+Output: `dist/ExchangeAuditTool_<version>.exe` (version taken from `AssemblyFileVersion` in `src/ExchangeAuditTool/Program.cs`). `dist/` is git-ignored.
 
 ## Release
 
-1. Bump `AssemblyFileVersion` (and `AssemblyVersion`) in `Program.cs`.
+1. Bump `AssemblyFileVersion` (and `AssemblyVersion`) in `src/ExchangeAuditTool/Program.cs`.
 2. Commit the version bump.
 3. Tag: `git tag vX.Y.Z`, then `git push origin vX.Y.Z`.
 4. The `Release` workflow builds the exe, writes SHA256 checksums (`dist/*.sha256`), warns (non-failing) if the tag does not match `AssemblyFileVersion`, and attaches `dist/*.exe` + `dist/*.sha256` to the GitHub release.
@@ -80,22 +88,30 @@ Notes:
 
 ## Project structure
 
+```
+ExchangeAuditTool.sln
+src/ExchangeAuditTool/      → App (net48 WinForms)
+tests/ExchangeAuditTool.Tests/ → xUnit tests for pure logic
+docs/                        → Additional documentation
+```
+
 | File | Purpose |
 |---|---|
-| `Program.cs` | Entry point + `MainForm` shell (title bar, sidebar nav, workspace, log card) |
-| `SectionPages.cs` | Connection page, per-section pages, `RunSectionAsync`, CSV preview |
-| `AuditModel.cs` | `AuditSection` / `AuditOptionGroup` / `AuditSelection` / `ScriptContext` DSL + `AuditRegistry.BuildAll()` |
-| `ExchangeConnection.cs` | `ConnectionMode`, `ConnectionSettings`, prelude / disconnect / status script builders |
-| `PowerShellSession.cs` | Persistent `powershell.exe` host, `Execute(script, timeout, onLine)` |
-| `Sections.Mailboxes.cs` | User mailbox export |
-| `Sections.MailboxTypes.cs` | Shared / Room / Equipment mailboxes |
-| `Sections.Groups.cs` | Distribution / Security / Dynamic / M365 groups |
-| `Sections.Contacts.cs` | Mail users / Mail contacts |
-| `Sections.DomainsRouting.cs` | Transport rules / Accepted / Remote domains / Connectors |
-| `Sections.PublicFolders.cs` | PF mailboxes / hierarchy / mail-enabled PF |
-| `Theme.cs`, `BrandAssets.cs` | Dark theme, `RoundedPanel` / `ModernButton`, vector icons, logo |
-| `app.manifest`, `app.ico` | `asInvoker`, PerMonitorV2 DPI, Win10/11 support; app icon |
-| `Build-ExchangeAuditTool.ps1` | `csc` build script |
+| `src/ExchangeAuditTool/Program.cs` | Entry point + `MainForm` shell (title bar, sidebar nav, workspace, log card) |
+| `src/ExchangeAuditTool/SectionPages.cs` | Connection page, per-section pages, `RunSectionAsync`, CSV preview |
+| `src/ExchangeAuditTool/AuditModel.cs` | `AuditSection` / `AuditOptionGroup` / `AuditSelection` / `ScriptContext` DSL + `AuditRegistry.BuildAll()` |
+| `src/ExchangeAuditTool/ExchangeConnection.cs` | `ConnectionMode`, `ConnectionSettings`, prelude / disconnect / status script builders |
+| `src/ExchangeAuditTool/PowerShellSession.cs` | Persistent `powershell.exe` host, `Execute(script, timeout, onLine)` |
+| `src/ExchangeAuditTool/PsScriptHelpers.cs` | Shared PS emitters (`Resolve-Recip`, `Get-SizeMB`), size group, collector |
+| `src/ExchangeAuditTool/Sections.Mailboxes.cs` | User mailbox export |
+| `src/ExchangeAuditTool/Sections.MailboxTypes.cs` | Shared / Room / Equipment mailboxes |
+| `src/ExchangeAuditTool/Sections.Groups.cs` | Distribution / Security / Dynamic / M365 groups |
+| `src/ExchangeAuditTool/Sections.Contacts.cs` | Mail users / Mail contacts |
+| `src/ExchangeAuditTool/Sections.DomainsRouting.cs` | Transport rules / Accepted / Remote domains / Connectors |
+| `src/ExchangeAuditTool/Sections.PublicFolders.cs` | PF mailboxes / hierarchy / mail-enabled PF |
+| `src/ExchangeAuditTool/Theme.cs`, `BrandAssets.cs` | Dark theme, `RoundedPanel` / `ModernButton`, vector icons, logo |
+| `src/ExchangeAuditTool/app.manifest`, `app.ico` | `asInvoker`, PerMonitorV2 DPI, Win10/11 support; app icon |
+| `Build-ExchangeAuditTool.ps1` | Build script (`dotnet publish`, `csc` fallback) |
 
 ## License
 
