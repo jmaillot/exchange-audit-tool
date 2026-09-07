@@ -54,6 +54,14 @@ namespace ExchangeAuditTool
             {
                 string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ExchangeAuditTool.startup.log");
                 try { File.AppendAllText(path, DateTime.Now + Environment.NewLine + ex + Environment.NewLine, Encoding.UTF8); } catch { }
+                try
+                {
+                    string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ExchangeAudit");
+                    Directory.CreateDirectory(dir);
+                    File.AppendAllText(Path.Combine(dir, "ExchangeAuditTool.activity.log"),
+                        "[" + DateTime.Now.ToString("HH:mm:ss") + "] [startup] " + ex + Environment.NewLine, Encoding.UTF8);
+                }
+                catch { }
                 MessageBox.Show("Exchange Audit Tool could not start." + Environment.NewLine + Environment.NewLine + ex.Message,
                     "Startup error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }

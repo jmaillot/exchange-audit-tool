@@ -358,7 +358,11 @@ namespace ExchangeAuditTool
 
             var page = new Panel { BackColor = UiTheme.Window, Padding = new Padding(0, 0, 0, 10) };
 
-            var split = new SplitContainer { Dock = DockStyle.Fill, BackColor = UiTheme.Window, SplitterWidth = 6, Panel1MinSize = 300, Panel2MinSize = 320 };
+            // NOTE: do NOT set Panel1MinSize/Panel2MinSize here. At construction the
+            // splitter is still its 200px default, so large min sizes make the
+            // first layout pass throw (SplitterDistance range check) and kill
+            // startup. Minimums are enforced by clamping in the handler below.
+            var split = new SplitContainer { Dock = DockStyle.Fill, BackColor = UiTheme.Window, SplitterWidth = 6 };
             var leftColumn = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Window, Padding = new Padding(0, 0, 8, 0) };
             var rightColumn = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Window, Padding = new Padding(8, 0, 0, 0) };
             split.Panel1.Controls.Add(leftColumn);
@@ -489,12 +493,14 @@ namespace ExchangeAuditTool
                 splitPlaced = true;
                 try
                 {
-                    int max = split.Width - split.Panel2MinSize - split.SplitterWidth;
+                    const int minLeft = 300;
+                    const int minRight = 320;
+                    int max = split.Width - minRight - split.SplitterWidth;
                     AppendLog("[layout] splitter init: width=" + split.Width + " max=" + max);
-                    if (max < split.Panel1MinSize) { AppendLog("[layout] splitter init skipped (too narrow)"); return; }
+                    if (max < minLeft) { AppendLog("[layout] splitter init skipped (too narrow)"); return; }
                     int d = 450;
                     if (d > max) d = max;
-                    if (d < split.Panel1MinSize) d = split.Panel1MinSize;
+                    if (d < minLeft) d = minLeft;
                     split.SplitterDistance = d;
                     AppendLog("[layout] splitter distance set to " + d);
                 }
