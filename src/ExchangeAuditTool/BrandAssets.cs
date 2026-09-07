@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.IO;
+using System.Reflection;
 
 namespace ExchangeAuditTool
 {
@@ -22,8 +23,28 @@ namespace ExchangeAuditTool
             return _logo;
         }
 
+        // Window/taskbar icon: the real app.ico (embedded resource), so the running
+        // app shows the same icon as the exe file. Falls back to the generated
+        // emblem if the resource is missing. Windows picks the best frame itself.
         public static System.Drawing.Icon AppIcon(int size)
         {
+            try
+            {
+                Assembly asm = typeof(BrandAssets).Assembly;
+                using (Stream res = asm.GetManifestResourceStream("ExchangeAuditTool.app.ico"))
+                {
+                    if (res != null)
+                    {
+                        using (var ms = new MemoryStream())
+                        {
+                            res.CopyTo(ms);
+                            // Backing stream must stay alive for the Icon lifetime.
+                            return new System.Drawing.Icon(new MemoryStream(ms.ToArray()));
+                        }
+                    }
+                }
+            }
+            catch { }
             return UiAssets.AppIcon(size);
         }
 

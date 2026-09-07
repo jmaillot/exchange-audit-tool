@@ -20,4 +20,11 @@
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- app.ico doubles as Win32 exe icon (ApplicationIcon) and embedded
+         window icon (loaded by BrandAssets from this resource). -->
+    <None Remove="app.ico" />
+    <EmbeddedResource Include="app.ico" />
+  </ItemGroup>
+
 </Project>

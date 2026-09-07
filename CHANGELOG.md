@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+### Fixed
+
+- Window/taskbar icon now uses the real `app.ico` (embedded resource) instead of the generated emblem
+
 ### Changed
 
 - Standard solution layout: sources under `src/ExchangeAuditTool`, xUnit tests under `tests/ExchangeAuditTool.Tests`
