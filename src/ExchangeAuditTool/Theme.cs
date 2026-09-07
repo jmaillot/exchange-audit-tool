@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace ExchangeAuditTool
@@ -130,6 +131,13 @@ namespace ExchangeAuditTool
         // to white (alpha preserved). Keeps one drawing implementation.
         public static Bitmap Render(string key, int size, bool white)
         {
+            string k = (key ?? "").ToLowerInvariant();
+            string glyph = Mdl2Glyph(k);
+            if (glyph != null && Mdl2Available())
+            {
+                try { return RenderGlyph(glyph, size, white); }
+                catch { }
+            }
             Bitmap bmp = RenderCore(key, size);
             if (!white) return bmp;
             for (int y = 0; y < bmp.Height; y++)
@@ -138,6 +146,50 @@ namespace ExchangeAuditTool
                     Color p = bmp.GetPixel(x, y);
                     if (p.A > 0) bmp.SetPixel(x, y, Color.FromArgb(p.A, 255, 255, 255));
                 }
+            return bmp;
+        }
+
+        // Segoe MDL2 Assets glyphs (ships with Windows 10/11) for crisp,
+        // professional nav icons. Codes verified against Microsoft docs.
+        // Returns null for keys without a mapping - caller falls back to drawing.
+        private static string Mdl2Glyph(string k)
+        {
+            if (k.Contains("connect")) return "\uE703";
+            if (k.Contains("perm")) return "\uE8D7";
+            if (k.Contains("folder")) return "\uE8B7";
+            if (k.Contains("group")) return "\uE716";
+            if (k.Contains("rule") || k.Contains("flow")) return "\uE71C";
+            if (k.Contains("shield") || k.Contains("hold") || k.Contains("compliance")) return "\uE72E";
+            if (k.Contains("mobile") || k.Contains("device")) return "\uE8EA";
+            if (k.Contains("mailbox") || k.Contains("mail")) return "\uE715";
+            return null;
+        }
+
+        private static bool? _mdl2;
+
+        private static bool Mdl2Available()
+        {
+            if (_mdl2 != null) return _mdl2.Value;
+            try { _mdl2 = new System.Drawing.Text.InstalledFontCollection().Families.Any(f => f.Name == "Segoe MDL2 Assets"); }
+            catch { _mdl2 = false; }
+            return _mdl2.Value;
+        }
+
+        private static Bitmap RenderGlyph(string glyph, int size, bool white)
+        {
+            var bmp = new Bitmap(size, size, PixelFormat.Format32bppPArgb);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+                g.Clear(Color.Transparent);
+                using (var font = new Font("Segoe MDL2 Assets", Math.Max(8, size - 2), FontStyle.Regular, GraphicsUnit.Pixel))
+                using (var brush = new SolidBrush(white ? Color.White : Steel))
+                using (var fmt = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                {
+                    g.DrawString(glyph, font, brush, new RectangleF(0, 0, size, size), fmt);
+                }
+            }
             return bmp;
         }
 
