@@ -59,7 +59,7 @@ namespace ExchangeAuditTool
         private sealed class NavCategory
         {
             public string Name;                 // display text (already upper-cased)
-            public Label Header;
+            public Control Header;
             public readonly List<Button> Buttons = new List<Button>();
             public bool Expanded;
             public bool Collapsible;
@@ -325,15 +325,15 @@ namespace ExchangeAuditTool
             footerStatus.Font = new Font("Segoe UI", 8.5F);
             footerStatus.TextAlign = ContentAlignment.MiddleLeft;
 
-            var version = new Label { Text = "v" + Application.ProductVersion, Dock = DockStyle.Bottom, Height = 18, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 7.5F), TextAlign = ContentAlignment.MiddleLeft };
+            var version = new Label { Text = "v" + Application.ProductVersion, Dock = DockStyle.Bottom, Height = 20, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F), TextAlign = ContentAlignment.MiddleLeft };
 
             var credits = new Label
             {
                 Text = "Credits: Jérémy MAILLOT\njmaillot@prodware.fr",
                 Dock = DockStyle.Bottom,
-                Height = 34,
+                Height = 36,
                 ForeColor = UiTheme.Muted,
-                Font = new Font("Segoe UI", 7.5F),
+                Font = new Font("Segoe UI", 8.5F),
                 TextAlign = ContentAlignment.MiddleLeft
             };
 
@@ -345,25 +345,28 @@ namespace ExchangeAuditTool
             return sidebar;
         }
 
-        private Label NewCategoryHeader(NavCategory cat)
+        private Button NewCategoryHeader(NavCategory cat)
         {
-            var lbl = new Label
+            var btn = new Button
             {
-                AutoSize = false,
                 Size = new Size(214, 22),
-                ForeColor = Color.FromArgb(66, 138, 247),
-                Font = new Font("Segoe UI Semibold", 8F),
+                FlatStyle = FlatStyle.Flat,
                 TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = Color.FromArgb(66, 138, 247),
+                BackColor = UiTheme.Sidebar,
+                Font = new Font("Segoe UI Semibold", 8F),
+                Cursor = cat.Collapsible ? Cursors.Hand : Cursors.Default,
+                TabStop = cat.Collapsible,
                 UseMnemonic = false
             };
+            btn.FlatAppearance.BorderSize = 0;
+            btn.FlatAppearance.MouseOverBackColor = UiTheme.Sidebar;
+            btn.FlatAppearance.MouseDownBackColor = UiTheme.Sidebar;
 
             if (cat.Collapsible)
-            {
-                lbl.Cursor = Cursors.Hand;
-                lbl.Click += delegate { cat.Expanded = !cat.Expanded; RelayoutNav(); };
-            }
-            lbl.Text = CategoryHeaderText(cat);
-            return lbl;
+                btn.Click += delegate { cat.Expanded = !cat.Expanded; RelayoutNav(); };
+            btn.Text = CategoryHeaderText(cat);
+            return btn;
         }
 
         // ASCII-only expand/collapse indicator: "[-] " when expanded, "[+] " when collapsed.
@@ -420,7 +423,7 @@ namespace ExchangeAuditTool
                 Cursor = Cursors.Hand,
                 BackColor = UiTheme.Sidebar,
                 ForeColor = UiTheme.Muted,
-                TabStop = false
+                TabStop = true
             };
             b.FlatAppearance.BorderSize = 0;
             return b;
@@ -497,12 +500,20 @@ namespace ExchangeAuditTool
             {
                 pageTitle.Text = "Connection";
                 pageSubtitle.Text = "Choose how the tool connects to Exchange before running any audit.";
+                AcceptButton = null;
+                CancelButton = null;
             }
             else
             {
                 AuditSection s = AuditRegistry.Sections[index - 1];
                 pageTitle.Text = s.Title;
                 pageSubtitle.Text = s.Subtitle;
+                SectionUi sui;
+                if (_sectionUi.TryGetValue(s.Id, out sui))
+                {
+                    AcceptButton = sui.RunButton;
+                    CancelButton = sui.CancelButton;
+                }
             }
             progressBanner.BackColor = UiTheme.Window;
         }
