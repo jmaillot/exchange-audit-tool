@@ -23,6 +23,28 @@ namespace ExchangeAuditTool
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            Application.ThreadException += delegate (object s, System.Threading.ThreadExceptionEventArgs e)
+            {
+                try
+                {
+                    string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ExchangeAudit");
+                    Directory.CreateDirectory(dir);
+                    File.AppendAllText(Path.Combine(dir, "ExchangeAuditTool.crash.log"),
+                        DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + Environment.NewLine + e.Exception + Environment.NewLine + "----" + Environment.NewLine, Encoding.UTF8);
+                }
+                catch { }
+            };
+            AppDomain.CurrentDomain.UnhandledException += delegate (object s, UnhandledExceptionEventArgs e)
+            {
+                try
+                {
+                    string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ExchangeAudit");
+                    Directory.CreateDirectory(dir);
+                    File.AppendAllText(Path.Combine(dir, "ExchangeAuditTool.crash.log"),
+                        DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + Environment.NewLine + e.ExceptionObject + Environment.NewLine + "----" + Environment.NewLine, Encoding.UTF8);
+                }
+                catch { }
+            };
             try
             {
                 AuditRegistry.BuildAll();

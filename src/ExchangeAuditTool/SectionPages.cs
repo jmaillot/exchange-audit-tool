@@ -490,13 +490,15 @@ namespace ExchangeAuditTool
                 try
                 {
                     int max = split.Width - split.Panel2MinSize - split.SplitterWidth;
-                    if (max < split.Panel1MinSize) return;
+                    AppendLog("[layout] splitter init: width=" + split.Width + " max=" + max);
+                    if (max < split.Panel1MinSize) { AppendLog("[layout] splitter init skipped (too narrow)"); return; }
                     int d = 450;
                     if (d > max) d = max;
                     if (d < split.Panel1MinSize) d = split.Panel1MinSize;
                     split.SplitterDistance = d;
+                    AppendLog("[layout] splitter distance set to " + d);
                 }
-                catch { }
+                catch (Exception ex) { AppendLog("[layout] splitter init failed: " + ex.Message); }
             };
             return page;
         }
