@@ -379,7 +379,7 @@ namespace ExchangeAuditTool
         {
             var btn = new Button
             {
-                Size = new Size(230, 24),
+                Size = new Size(230, 28),
                 FlatStyle = FlatStyle.Flat,
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Color.FromArgb(66, 138, 247),
@@ -390,8 +390,8 @@ namespace ExchangeAuditTool
                 UseMnemonic = false
             };
             btn.FlatAppearance.BorderSize = 0;
-            btn.FlatAppearance.MouseOverBackColor = UiTheme.Sidebar;
-            btn.FlatAppearance.MouseDownBackColor = UiTheme.Sidebar;
+            btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(17, 34, 53);
+            btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(23, 44, 68);
 
             if (cat.Collapsible)
                 btn.Click += delegate { cat.Expanded = !cat.Expanded; RelayoutNav(); };
@@ -399,12 +399,12 @@ namespace ExchangeAuditTool
             return btn;
         }
 
-        // ASCII-only expand/collapse indicator: "[-] " when expanded, "[+] " when collapsed.
-        // The sub-section count is appended as " (N)" so the user knows items are inside.
+        // Chevron triangles (always available in Segoe UI) read cleaner than
+        // ASCII [-]/[+] blocks. The sub-section count stays as " (N)".
         private static string CategoryHeaderText(NavCategory cat)
         {
             if (!cat.Collapsible) return cat.Name;
-            return (cat.Expanded ? "[-] " : "[+] ") + cat.Name + " (" + cat.Buttons.Count + ")";
+            return (cat.Expanded ? "\u25BE " : "\u25B8 ") + cat.Name + " (" + cat.Buttons.Count + ")";
         }
 
         private void RelayoutNav()
@@ -420,7 +420,7 @@ namespace ExchangeAuditTool
                     cat.Header.Location = new Point(4, y);
                     cat.Header.Text = CategoryHeaderText(cat);
                 }
-                y += 26;
+                y += 30;
 
                 foreach (Button b in cat.Buttons)
                 {
