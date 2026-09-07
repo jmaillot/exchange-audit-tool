@@ -56,3 +56,4 @@ jobs:
             dist/*.exe
             dist/*.sha256
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
