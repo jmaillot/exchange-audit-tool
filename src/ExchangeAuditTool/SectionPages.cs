@@ -62,6 +62,7 @@ namespace ExchangeAuditTool
             public Dictionary<string, List<RadioButton>> Radios = new Dictionary<string, List<RadioButton>>();
             public TextBox OutputPath;
             public ModernButton RunButton;
+            public ModernButton CancelButton;
             public ModernButton OpenButton;
             public DataGridView Grid;
             public Label ResultInfo;
@@ -100,7 +101,7 @@ namespace ExchangeAuditTool
 
             var connectedRow = new Panel { Dock = DockStyle.Top, Height = 30, BackColor = UiTheme.Surface };
             var connectedLabel = new Label { Text = "Connected as:", Dock = DockStyle.Left, Width = 90, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
-            _connectedAs = new Label { Text = "not connected", Dock = DockStyle.Left, Width = 420, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
+            _connectedAs = new Label { Text = "✗ not connected", Dock = DockStyle.Left, Width = 420, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
             connectedRow.Controls.Add(_connectedAs);
             connectedRow.Controls.Add(connectedLabel);
 
@@ -329,12 +330,25 @@ namespace ExchangeAuditTool
             else SetConnectedAs(null);
         }
 
+        private bool _isConnected;
+
         private void SetConnectedAs(string who)
         {
             if (_connectedAs == null) return;
-            if (string.IsNullOrEmpty(who)) { _connectedAs.Text = "not connected"; _connectedAs.ForeColor = UiTheme.Muted; }
-            else if (who == "checking...") { _connectedAs.Text = who; _connectedAs.ForeColor = UiTheme.Orange; }
-            else { _connectedAs.Text = who; _connectedAs.ForeColor = UiTheme.Green; }
+            if (string.IsNullOrEmpty(who)) { _connectedAs.Text = "✗ not connected"; _connectedAs.ForeColor = UiTheme.Muted; _isConnected = false; }
+            else if (who == "checking...") { _connectedAs.Text = "… checking..."; _connectedAs.ForeColor = UiTheme.Orange; }
+            else { _connectedAs.Text = "✓ " + who; _connectedAs.ForeColor = UiTheme.Green; _isConnected = true; }
+            SetCanRun(_isConnected);
+        }
+
+        private void SetCanRun(bool connected)
+        {
+            foreach (var kv in _sectionUi)
+            {
+                if (kv.Value.RunButton == null) continue;
+                kv.Value.RunButton.Enabled = connected;
+                _optionTip.SetToolTip(kv.Value.RunButton, connected ? "Run the audit and export CSV" : "Connect to Exchange first");
+            }
         }
 
         private Control BuildSectionPage(AuditSection section)
@@ -344,8 +358,12 @@ namespace ExchangeAuditTool
 
             var page = new Panel { BackColor = UiTheme.Window, Padding = new Padding(0, 0, 0, 10) };
 
-            var leftColumn = new Panel { Dock = DockStyle.Left, Width = 450, BackColor = UiTheme.Window, Padding = new Padding(0, 0, 8, 0) };
+            var split = new SplitContainer { Dock = DockStyle.Fill, BackColor = UiTheme.Window, SplitterWidth = 6, Panel1MinSize = 300, Panel2MinSize = 320 };
+            split.SplitterDistance = 450;
+            var leftColumn = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Window, Padding = new Padding(0, 0, 8, 0) };
             var rightColumn = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Window, Padding = new Padding(8, 0, 0, 0) };
+            split.Panel1.Controls.Add(leftColumn);
+            split.Panel2.Controls.Add(rightColumn);
 
             var optionsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(16, 14, 16, 14), AutoScroll = true };
 
@@ -388,20 +406,46 @@ namespace ExchangeAuditTool
             outputRow.Controls.Add(browse);
             outputRow.Dock = DockStyle.Bottom;
 
-            ui.RunButton = new ModernButton { Text = "RUN AUDIT", Dock = DockStyle.Bottom, Height = 42 };
+            ui.RunButton = new ModernButton { Text = "RUN AUDIT", Dock = DockStyle.Fill, Height = 42, Enabled = false };
             ui.RunButton.NormalColor = UiTheme.Blue; ui.RunButton.BackColor = UiTheme.Blue; ui.RunButton.ForeColor = Color.White;
             ui.RunButton.Click += async delegate { await RunSectionAsync(ui); };
+            _optionTip.SetToolTip(ui.RunButton, "Connect to Exchange first");
+            ui.CancelButton = new ModernButton { Text = "Cancel", Dock = DockStyle.Right, Width = 110, Height = 42, Enabled = false };
+            ui.CancelButton.Click += delegate { AppendLog("Cancellation requested..."); _ps.Cancel(); };
+            var buttonsRow = new Panel { Dock = DockStyle.Bottom, Height = 42, BackColor = UiTheme.Window };
+            buttonsRow.Controls.Add(ui.RunButton);
+            buttonsRow.Controls.Add(ui.CancelButton);
+
+            var slowHint = new Label { Text = "Slow options selected - this run may take much longer.", Dock = DockStyle.Bottom, Height = 24, ForeColor = UiTheme.Orange, Font = new Font("Segoe UI", 8.3F), TextAlign = ContentAlignment.MiddleLeft, Visible = false };
 
             leftColumn.Controls.Add(optionsCard);
             leftColumn.Controls.Add(outputRow);
-            leftColumn.Controls.Add(ui.RunButton);
+            leftColumn.Controls.Add(slowHint);
+            leftColumn.Controls.Add(buttonsRow);
+
+            foreach (var kv in ui.Checks)
+                foreach (CheckBox cb in kv.Value)
+                    cb.CheckedChanged += delegate { slowHint.Visible = HasSlowOptions(ui); };
+            slowHint.Visible = HasSlowOptions(ui);
 
             var resultsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(12, 10, 12, 12) };
             var rHead = new Panel { Dock = DockStyle.Top, Height = 30, BackColor = UiTheme.Surface };
             var rTitle = new Label { Text = "Results preview", Dock = DockStyle.Left, Width = 160, ForeColor = UiTheme.Text, Font = new Font("Segoe UI Semibold", 9.5F), TextAlign = ContentAlignment.MiddleLeft };
             ui.OpenButton = new ModernButton { Text = "Open CSV", Dock = DockStyle.Right, Width = 96, Height = 26, Padding = new Padding(0), Enabled = false };
             ui.OpenButton.Click += delegate { if (!string.IsNullOrEmpty(ui.LastCsv) && File.Exists(ui.LastCsv)) OpenPath(ui.LastCsv); };
+            var folderBtn = new ModernButton { Text = "Folder", Dock = DockStyle.Right, Width = 70, Height = 26, Padding = new Padding(0) };
+            folderBtn.Click += delegate
+            {
+                if (string.IsNullOrEmpty(ui.LastCsv)) return;
+                try
+                {
+                    string dir = Path.GetDirectoryName(ui.LastCsv);
+                    if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir)) OpenPath(dir);
+                }
+                catch { }
+            };
             rHead.Controls.Add(ui.OpenButton);
+            rHead.Controls.Add(folderBtn);
             rHead.Controls.Add(rTitle);
 
             ui.ResultInfo = new Label { Text = "No results yet.", Dock = DockStyle.Top, Height = 22, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.3F) };
@@ -417,7 +461,9 @@ namespace ExchangeAuditTool
                 RowHeadersVisible = false,
                 EnableHeadersVisualStyles = false,
                 GridColor = UiTheme.Border,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                AllowUserToOrderColumns = true,
+                ClipboardCopyMode = DataGridViewClipboardCopyMode.EnableAlwaysIncludeHeaderText
             };
             ui.Grid.ColumnHeadersDefaultCellStyle.BackColor = UiTheme.Surface2;
             ui.Grid.ColumnHeadersDefaultCellStyle.ForeColor = UiTheme.Text;
@@ -433,9 +479,26 @@ namespace ExchangeAuditTool
             resultsCard.Controls.Add(rHead);
             rightColumn.Controls.Add(resultsCard);
 
-            page.Controls.Add(rightColumn);
-            page.Controls.Add(leftColumn);
+            page.Controls.Add(split);
             return page;
+        }
+
+        // Per-mailbox / per-folder lookups (regional config, statistics, folder
+        // permissions) dominate runtime. Warn before the user starts a slow run.
+        private static bool HasSlowOptions(SectionUi ui)
+        {
+            foreach (var kv in ui.Checks)
+            {
+                bool groupSlow = kv.Key == "folderperms" || kv.Key == "stats";
+                foreach (CheckBox cb in kv.Value)
+                {
+                    if (!cb.Checked) continue;
+                    if (groupSlow) return true;
+                    string v = ((AuditOption)cb.Tag).Value;
+                    if (v == "regional" || v == "mailboxsize") return true;
+                }
+            }
+            return false;
         }
 
         private Control BuildOptionGroup(SectionUi ui, AuditOptionGroup grp)
@@ -525,49 +588,70 @@ namespace ExchangeAuditTool
             string full = ConnectionSettings.BuildPrelude() + Environment.NewLine + body;
 
             ui.RunButton.Enabled = false;
+            ui.CancelButton.Enabled = true;
             SetBusy(true);
-            try
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            using (var tick = new System.Windows.Forms.Timer { Interval = 500 })
             {
-                SetFooter("Running " + section.NavTitle + "...", UiTheme.Orange);
-                AppendLog("=== " + section.Title + " ===");
-                AppendLog(ConnectionSettings.Summary());
-                LogCommand(section.NavTitle + " - PowerShell", body);
-
+                tick.Tick += delegate { SetFooter("Running " + section.NavTitle + "... " + sw.Elapsed.ToString("mm\\:ss"), UiTheme.Orange); };
+                tick.Start();
                 try
                 {
-                    string dir = Path.GetDirectoryName(csv);
-                    if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-                }
-                catch { }
-                try { if (File.Exists(csv)) File.Delete(csv); } catch { }
+                    SetFooter("Running " + section.NavTitle + "... 00:00", UiTheme.Orange);
+                    AppendLog("=== " + section.Title + " ===");
+                    AppendLog(ConnectionSettings.Summary());
+                    LogCommand(section.NavTitle + " - PowerShell", body);
 
-                var result = await RunPowerShellScriptAsync(full);
+                    try
+                    {
+                        string dir = Path.GetDirectoryName(csv);
+                        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                    }
+                    catch { }
+                    try { if (File.Exists(csv)) File.Delete(csv); } catch { }
 
-                if (result.ExitCode == 0 && File.Exists(csv))
-                {
-                    ui.LastCsv = csv;
-                    ui.OpenButton.Enabled = true;
-                    int previewed = LoadCsvIntoGrid(ui.Grid, csv, 200);
-                    int total = CountCsvDataRows(csv);
-                    if (total > 200)
-                        ui.ResultInfo.Text = "Exported " + total + " rows to " + Path.GetFileName(csv) + " (previewing first 200).";
+                    var result = await RunPowerShellScriptAsync(full);
+                    sw.Stop();
+
+                    if (result.ExitCode == 0 && File.Exists(csv))
+                    {
+                        ui.LastCsv = csv;
+                        ui.OpenButton.Enabled = true;
+                        int previewed = LoadCsvIntoGrid(ui.Grid, csv, 200);
+                        int total = CountCsvDataRows(csv);
+                        string size;
+                        try { size = FormatBytes(new FileInfo(csv).Length); }
+                        catch { size = "?"; }
+                        string took = sw.Elapsed.ToString("mm\\:ss");
+                        if (total > 200)
+                            ui.ResultInfo.Text = "✓ Exported " + total + " rows (" + size + ") in " + took + " (previewing first 200).";
+                        else
+                            ui.ResultInfo.Text = "✓ Exported to " + Path.GetFileName(csv) + " (" + size + ") in " + took + "  -  " + previewed + " row(s) previewed.";
+                        ui.ResultInfo.ForeColor = UiTheme.Green;
+                        SetFooter(section.NavTitle + " done in " + took, UiTheme.Green);
+                        if (!_isConnected) await RefreshConnectedAsAsync();
+                    }
+                    else if (result.Output.Contains("[cancelled by user]"))
+                    {
+                        ui.ResultInfo.Text = "✗ Cancelled by user after " + sw.Elapsed.ToString("mm\\:ss") + " - partial output discarded.";
+                        ui.ResultInfo.ForeColor = UiTheme.Orange;
+                        SetFooter(section.NavTitle + " cancelled", UiTheme.Orange);
+                    }
                     else
-                        ui.ResultInfo.Text = "Exported to " + Path.GetFileName(csv) + "  -  " + previewed + " row(s) previewed.";
-                    ui.ResultInfo.ForeColor = UiTheme.Green;
-                    SetFooter(section.NavTitle + " done", UiTheme.Green);
-                    if (_connectedAs != null && _connectedAs.Text == "not connected") await RefreshConnectedAsAsync();
+                    {
+                        ui.ResultInfo.Text = "✗ Run failed in " + sw.Elapsed.ToString("mm\\:ss") + " - see the activity log.";
+                        ui.ResultInfo.ForeColor = UiTheme.Red;
+                        SetFooter(section.NavTitle + " failed", UiTheme.Red);
+                    }
                 }
-                else
+                finally
                 {
-                    ui.ResultInfo.Text = "Run failed - see the activity log.";
-                    ui.ResultInfo.ForeColor = UiTheme.Red;
-                    SetFooter(section.NavTitle + " failed", UiTheme.Red);
+                    tick.Stop();
+                    sw.Stop();
+                    SetBusy(false);
+                    ui.RunButton.Enabled = _isConnected;
+                    ui.CancelButton.Enabled = false;
                 }
-            }
-            finally
-            {
-                SetBusy(false);
-                ui.RunButton.Enabled = true;
             }
         }
 
@@ -583,6 +667,13 @@ namespace ExchangeAuditTool
                 return Math.Max(0, lines - 1);
             }
             catch { return 0; }
+        }
+
+        private static string FormatBytes(long bytes)
+        {
+            if (bytes < 1024) return bytes + " B";
+            if (bytes < 1048576) return (bytes / 1024) + " KB";
+            return (bytes / 1048576.0).ToString("0.0") + " MB";
         }
 
         private Task<PsResult> RunPowerShellCaptureAsync(string command)
@@ -639,7 +730,14 @@ namespace ExchangeAuditTool
                         dataRows++;
                     }
                 }
-                foreach (DataGridViewColumn c in grid.Columns) c.Width = 150;
+                foreach (DataGridViewColumn c in grid.Columns)
+                {
+                    c.SortMode = DataGridViewColumnSortMode.Automatic;
+                    c.AutoSizeMode = DataGridViewAutoSizeColumnMode.DisplayedCells;
+                    if (c.Width > 320) c.Width = 320;
+                    if (c.Width < 40) c.Width = 40;
+                    c.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                }
             }
             catch (Exception ex) { AppendLog("[preview] " + ex.Message); }
             return dataRows;
