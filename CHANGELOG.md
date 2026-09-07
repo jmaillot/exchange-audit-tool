@@ -4,6 +4,20 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-08
+
+### Added
+
+- Cancellable audit runs with elapsed timer and run summaries (rows, size, duration)
+- Sortable/copyable results grid, Folder button, empty state, slow-option warning
+- Resizable options/results splitter, keyboard navigation, status glyphs
+- Segoe MDL2 Assets nav icons, refreshed sidebar type, chevron category headers
+- Crash log with stack traces for unhandled errors
+
+### Fixed
+
+- Splitter startup crash from pre-layout min sizes
+
 ## [1.1.0] - 2026-09-07
 
 ### Fixed
