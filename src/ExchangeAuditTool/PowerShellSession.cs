@@ -16,6 +16,7 @@ namespace ExchangeAuditTool
         private bool _hadError;
         private ManualResetEvent _done;
         private Action<string> _onLine;
+        private volatile bool _cancelRequested;
 
         public bool IsAlive { get { return _proc != null && !_proc.HasExited; } }
 
@@ -74,6 +75,7 @@ namespace ExchangeAuditTool
             try
             {
                 if (!IsAlive) Start();
+                _cancelRequested = false;
 
                 string marker = "<<<EAT_END_" + Guid.NewGuid().ToString("N") + ">>>";
                 string tempFile = Path.Combine(Path.GetTempPath(), "ExAudit-" + Guid.NewGuid().ToString("N") + ".ps1");
@@ -116,6 +118,13 @@ namespace ExchangeAuditTool
                             _done = null;
                         }
 
+                        if (_cancelRequested)
+                        {
+                            try { Dispose(); } catch { }
+                            try { Start(); } catch { }
+                            return new PsResult(-1, "[cancelled by user]");
+                        }
+
                         if (!finished)
                         {
                             try { Dispose(); } catch { }
@@ -128,6 +137,7 @@ namespace ExchangeAuditTool
                 }
                 catch (Exception ex)
                 {
+                    if (_cancelRequested) return new PsResult(-1, "[cancelled by user]");
                     return new PsResult(-1, ex.Message);
                 }
                 finally
@@ -139,6 +149,13 @@ namespace ExchangeAuditTool
             {
                 try { _gate.Release(); } catch { }
             }
+        }
+
+        public void Cancel()
+        {
+            _cancelRequested = true;
+            lock (_sync) { try { if (_done != null) _done.Set(); } catch { } }
+            try { if (_proc != null && !_proc.HasExited) _proc.Kill(); } catch { }
         }
 
         public void Dispose()
