@@ -27,7 +27,7 @@ jobs:
         shell: powershell
         run: |
           $tag = "${{ github.ref_name }}".TrimStart("v")
-          $text = Get-Content -LiteralPath "Program.cs" -Raw
+          $text = Get-Content -LiteralPath "src/ExchangeAuditTool/Program.cs" -Raw
           $m = [regex]::Match($text, 'AssemblyFileVersion\("([0-9]+(?:\.[0-9]+){1,3})"\)')
           $fileVersion = if ($m.Success) { $m.Groups[1].Value -replace '^(\d+\.\d+\.\d+)\.\d+$', '$1' } else { "" }
           Write-Host "Tag version: $tag"
