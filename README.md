@@ -99,4 +99,4 @@ Notes:
 
 ## License
 
-MIT — see `LICENSE` (copy of `LICENCE`).
+MIT — see `LICENSE`.
