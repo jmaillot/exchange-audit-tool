@@ -40,6 +40,18 @@ jobs:
         shell: powershell
         run: Get-ChildItem dist
 
+      - name: Suffix prerelease exe with tag (builds stay distinguishable)
+        shell: powershell
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag.Contains("-")) {
+            Get-ChildItem dist/*.exe | ForEach-Object {
+              $leaf = $_.Name -replace '\.exe$', "-$tag.exe"
+              Rename-Item -LiteralPath $_.FullName -NewName $leaf
+            }
+          }
+          Get-ChildItem dist
+
       - name: Checksum (SHA256)
         shell: powershell
         run: |
