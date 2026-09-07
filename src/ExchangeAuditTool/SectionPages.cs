@@ -359,7 +359,6 @@ namespace ExchangeAuditTool
             var page = new Panel { BackColor = UiTheme.Window, Padding = new Padding(0, 0, 0, 10) };
 
             var split = new SplitContainer { Dock = DockStyle.Fill, BackColor = UiTheme.Window, SplitterWidth = 6, Panel1MinSize = 300, Panel2MinSize = 320 };
-            split.SplitterDistance = 450;
             var leftColumn = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Window, Padding = new Padding(0, 0, 8, 0) };
             var rightColumn = new Panel { Dock = DockStyle.Fill, BackColor = UiTheme.Window, Padding = new Padding(8, 0, 0, 0) };
             split.Panel1.Controls.Add(leftColumn);
@@ -480,6 +479,25 @@ namespace ExchangeAuditTool
             rightColumn.Controls.Add(resultsCard);
 
             page.Controls.Add(split);
+            // SplitterDistance is only valid once the control has its real width
+            // (at construction it is still the 200px default). Place it on first
+            // show, clamped to the min sizes so narrow windows cannot throw.
+            bool splitPlaced = false;
+            page.VisibleChanged += delegate
+            {
+                if (!page.Visible || splitPlaced) return;
+                splitPlaced = true;
+                try
+                {
+                    int max = split.Width - split.Panel2MinSize - split.SplitterWidth;
+                    if (max < split.Panel1MinSize) return;
+                    int d = 450;
+                    if (d > max) d = max;
+                    if (d < split.Panel1MinSize) d = split.Panel1MinSize;
+                    split.SplitterDistance = d;
+                }
+                catch { }
+            };
             return page;
         }
 
