@@ -646,7 +646,7 @@ namespace ExchangeAuditTool
         }
 
         // CSV delimiter is ';' (see ScriptContext.ExportCsv).
-        private static string[] ParseCsvLine(string line)
+        internal static string[] ParseCsvLine(string line)
         {
             var result = new List<string>();
             var sb = new StringBuilder();

@@ -19,6 +19,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build (gate)
+      - name: Build
         shell: powershell
-        run: ./Build-ExchangeAuditTool.ps1
+        run: dotnet build ExchangeAuditTool.sln -c Release
+
+      - name: Test
+        shell: powershell
+        run: dotnet test ExchangeAuditTool.sln -c Release --no-build

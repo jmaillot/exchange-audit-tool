@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using System.Text;
 
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("ExchangeAuditTool.Tests")]
+
 namespace ExchangeAuditTool
 {
     internal static class PsScriptHelpers
