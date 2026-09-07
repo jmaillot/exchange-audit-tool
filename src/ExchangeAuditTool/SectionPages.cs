@@ -66,6 +66,7 @@ namespace ExchangeAuditTool
             public ModernButton OpenButton;
             public DataGridView Grid;
             public Label ResultInfo;
+            public Label EmptyState;
             public string LastCsv;
         }
 
@@ -480,30 +481,28 @@ namespace ExchangeAuditTool
             resultsCard.Controls.Add(ui.Grid);
             resultsCard.Controls.Add(ui.ResultInfo);
             resultsCard.Controls.Add(rHead);
+            ui.EmptyState = new Label { Text = "No results yet." + Environment.NewLine + "Pick options and press RUN AUDIT.", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 10F), BackColor = Color.FromArgb(6, 15, 26) };
+            resultsCard.Controls.Add(ui.EmptyState);
+            ui.EmptyState.BringToFront();
             rightColumn.Controls.Add(resultsCard);
 
             page.Controls.Add(split);
-            // SplitterDistance is only valid once the control has its real width
-            // (at construction it is still the 200px default). Place it on first
-            // show, clamped to the min sizes so narrow windows cannot throw.
+            // Place the splitter once the page has its real width. VisibleChanged
+            // fires before Dock layout runs (stale 200px default), so use Layout
+            // and wait until the width is sane. Minimums are clamped, never set
+            // pre-layout (that crashed startup on narrow widths).
             bool splitPlaced = false;
-            page.VisibleChanged += delegate
+            page.Layout += delegate
             {
-                if (!page.Visible || splitPlaced) return;
-                splitPlaced = true;
-                try
-                {
-                    const int minLeft = 300;
-                    const int minRight = 320;
-                    int max = split.Width - minRight - split.SplitterWidth;
-                    AppendLog("[layout] splitter init: width=" + split.Width + " max=" + max);
-                    if (max < minLeft) { AppendLog("[layout] splitter init skipped (too narrow)"); return; }
-                    int d = 450;
-                    if (d > max) d = max;
-                    if (d < minLeft) d = minLeft;
-                    split.SplitterDistance = d;
-                    AppendLog("[layout] splitter distance set to " + d);
-                }
+                if (splitPlaced) return;
+                const int minLeft = 300;
+                const int minRight = 320;
+                if (split.Width < minLeft + minRight + split.SplitterWidth) return;
+                int max = split.Width - minRight - split.SplitterWidth;
+                int d = 450;
+                if (d > max) d = max;
+                if (d < minLeft) d = minLeft;
+                try { split.SplitterDistance = d; splitPlaced = true; }
                 catch (Exception ex) { AppendLog("[layout] splitter init failed: " + ex.Message); }
             };
             return page;
@@ -556,7 +555,7 @@ namespace ExchangeAuditTool
                 foreach (AuditOption opt in grp.Options)
                 {
                     bool initChecked = ui.Section.ScopeAwareDefaults ? (ConnectionSettings.IsOnline ? opt.DefOnline : opt.DefOnPrem) : opt.DefaultChecked;
-                    var cb = new CheckBox { Text = opt.Label, Checked = initChecked, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.6F), Margin = new Padding(2, 3, 8, 3) };
+                    var cb = new CheckBox { Text = opt.Label, Checked = initChecked, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 9F), Margin = new Padding(2, 3, 8, 3) };
                     cb.Tag = opt;
                     _optionTip.SetToolTip(cb, opt.Label);
                     list.Add(cb);
@@ -570,7 +569,7 @@ namespace ExchangeAuditTool
                 bool anyChecked = false;
                 foreach (AuditOption opt in grp.Options)
                 {
-                    var rb = new RadioButton { Text = opt.Label, Checked = opt.DefaultChecked, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.6F), Margin = new Padding(2, 3, 8, 3) };
+                    var rb = new RadioButton { Text = opt.Label, Checked = opt.DefaultChecked, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 9F), Margin = new Padding(2, 3, 8, 3) };
                     if (opt.DefaultChecked) anyChecked = true;
                     rb.Tag = opt;
                     _optionTip.SetToolTip(rb, opt.Label);
@@ -653,6 +652,7 @@ namespace ExchangeAuditTool
                             ui.ResultInfo.Text = "✓ Exported " + total + " rows (" + size + ") in " + took + " (previewing first 200).";
                         else
                             ui.ResultInfo.Text = "✓ Exported to " + Path.GetFileName(csv) + " (" + size + ") in " + took + "  -  " + previewed + " row(s) previewed.";
+                        ui.EmptyState.Visible = total == 0;
                         ui.ResultInfo.ForeColor = UiTheme.Green;
                         SetFooter(section.NavTitle + " done in " + took, UiTheme.Green);
                         if (!_isConnected) await RefreshConnectedAsAsync();
