@@ -34,3 +34,7 @@ graphify-out/
 *.tmp
 *.bak
 *~
+# Build intermediates (SDK-migration future-proofing)
+bin/
+obj/
+*.dll

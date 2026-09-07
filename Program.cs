@@ -94,7 +94,7 @@ namespace ExchangeAuditTool
             // (the real startup size is applied in ApplyStartupWindow()).
             MinimumSize = new Size(960, 640);
             Size = StartupSize;
-            AutoScaleMode = AutoScaleMode.None;
+            AutoScaleMode = AutoScaleMode.Dpi;
             Font = new Font("Segoe UI", 9F);
             BackColor = UiTheme.Window;
             ForeColor = UiTheme.Text;

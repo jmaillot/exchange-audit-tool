@@ -37,8 +37,8 @@ Each section is a declarative `AuditSection` (`AuditModel.cs`): option groups re
 
 - Windows with .NET Framework 4.x (`csc.exe` at `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe`)
 - `powershell.exe` available (used as a persistent child process)
-- For Exchange Online: `ExchangeOnlineManagement` module (the app can install it from the Connection page via `Install-Module -Scope CurrentUser`)
-- Exchange permissions to run `Get-*` cmdlets (read-only audit, no writes except `Export-Csv`)
+- For Exchange Online: `ExchangeOnlineManagement` module, any recent version (the app can install it from the Connection page via `Install-Module -Scope CurrentUser`)
+- Exchange permissions to run `Get-*` cmdlets (read-only audit, no writes except `Export-Csv`); e.g. View-Only Organization Management, or Recipient Management read access
 
 ## Build
 
@@ -50,6 +50,19 @@ No `.csproj` / `.sln`, no NuGet. Direct `csc` invocation:
 ```
 
 Output: `dist/ExchangeAuditTool_<version>.exe` (single-file `winexe`, version taken from `AssemblyFileVersion` in `Program.cs`). `dist/` is git-ignored.
+
+## Release
+
+1. Bump `AssemblyFileVersion` (and `AssemblyVersion`) in `Program.cs`.
+2. Commit the version bump.
+3. Tag: `git tag vX.Y.Z`, then `git push origin vX.Y.Z`.
+4. The `Release` workflow builds the exe, writes SHA256 checksums (`dist/*.sha256`), warns (non-failing) if the tag does not match `AssemblyFileVersion`, and attaches `dist/*.exe` + `dist/*.sha256` to the GitHub release.
+
+## Excel import (`;`-delimited UTF-8 CSV)
+
+1. Excel > Data > From Text/CSV, select the exported CSV.
+2. Set File Origin to `65001: Unicode (UTF-8)` and Delimiter to `Semicolon`.
+3. Load. Multi-value cells are `,`-joined inside the `;`-delimited file.
 
 ## Run / Use
 
@@ -86,4 +99,4 @@ Notes:
 
 ## License
 
-MIT — see `LICENCE`.
+MIT — see `LICENSE` (copy of `LICENCE`).

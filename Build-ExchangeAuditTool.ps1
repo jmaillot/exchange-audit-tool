@@ -6,21 +6,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$sources = @(
-    "Theme.cs",
-    "AuditModel.cs",
-    "ExchangeConnection.cs",
-    "PowerShellSession.cs",
-    "BrandAssets.cs",
-    "Program.cs",
-    "SectionPages.cs",
-    "Sections.Mailboxes.cs",
-    "Sections.MailboxTypes.cs",
-    "Sections.Groups.cs",
-    "Sections.Contacts.cs",
-    "Sections.PublicFolders.cs",
-    "Sections.DomainsRouting.cs"
-) | ForEach-Object { Join-Path $PSScriptRoot $_ }
+$sources = Get-ChildItem -LiteralPath $PSScriptRoot -Filter *.cs -File |
+    Where-Object { $_.FullName -notmatch '[\\/](obj|bin)[\\/]' } |
+    Sort-Object FullName |
+    Select-Object -ExpandProperty FullName
 
 $manifest = Join-Path $PSScriptRoot "app.manifest"
 $icon     = Join-Path $PSScriptRoot "app.ico"
