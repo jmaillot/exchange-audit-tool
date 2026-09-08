@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- Saved connection profiles: name, save, delete and auto-restore last-used connection fields (`profiles.json` next to the activity log; passwords are never stored)
+
 ### Changed
 
 - README refocused as a user guide; developer build/release/structure docs moved to BUILD.md
