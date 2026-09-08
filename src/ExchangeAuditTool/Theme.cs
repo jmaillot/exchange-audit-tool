@@ -42,6 +42,27 @@ namespace ExchangeAuditTool
             ResizeRedraw = true;
         }
 
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            UpdateRegion();
+        }
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            UpdateRegion();
+        }
+
+        private void UpdateRegion()
+        {
+            if (Width < 4 || Height < 4) return;
+            Rectangle rect = new Rectangle(0, 0, Width - 1, Height - 1);
+            int radius = Math.Min(CornerRadius, Math.Max(1, Math.Min(Width, Height) / 2 - 1));
+            using (GraphicsPath path = BuildRoundRect(rect, radius))
+                Region = new Region(path);
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
@@ -52,7 +73,6 @@ namespace ExchangeAuditTool
             using (GraphicsPath path = BuildRoundRect(rect, radius))
             using (Pen pen = new Pen(BorderColor, BorderThickness))
             {
-                Region = new Region(path);
                 if (BorderThickness > 0) e.Graphics.DrawPath(pen, path);
             }
         }
@@ -93,9 +113,31 @@ namespace ExchangeAuditTool
             Height = 36;
         }
 
-        protected override bool ShowFocusCues { get { return false; } }
-        protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); BackColor = HoverColor; }
-        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); BackColor = Active ? UiTheme.Blue : NormalColor; }
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            if (Enabled) BackColor = HoverColor;
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            if (Enabled) BackColor = Active ? UiTheme.Blue : NormalColor;
+        }
+
+        protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
+        protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+        protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            if (Width < 4 || Height < 4) return;
+            Rectangle r = new Rectangle(0, 0, Width - 1, Height - 1);
+            int rad = Math.Min(CornerRadius, Math.Max(1, Math.Min(Width, Height) / 2 - 1));
+            using (GraphicsPath p = RoundedPanel.BuildRoundRect(r, rad))
+                Region = new Region(p);
+        }
 
         protected override void OnPaint(PaintEventArgs pevent)
         {
@@ -103,15 +145,34 @@ namespace ExchangeAuditTool
             pevent.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             Rectangle rect = new Rectangle(0, 0, Width - 1, Height - 1);
             int radius = Math.Min(CornerRadius, Math.Max(1, Math.Min(Width, Height) / 2 - 1));
-            using (GraphicsPath path = RoundedPanel.BuildRoundRect(rect, radius))
-            using (SolidBrush brush = new SolidBrush(BackColor))
-            using (Pen pen = new Pen(Active ? Color.FromArgb(92, 151, 255) : BorderColor))
+            Color bg = BackColor;
+            Color fg = ForeColor;
+            Color border = Active ? Color.FromArgb(92, 151, 255) : BorderColor;
+            if (!Enabled)
             {
-                Region = new Region(path);
+                bg = Color.FromArgb(28, 42, 60);
+                fg = UiTheme.Muted;
+                border = Color.FromArgb(35, 55, 78);
+            }
+            using (GraphicsPath path = RoundedPanel.BuildRoundRect(rect, radius))
+            using (SolidBrush brush = new SolidBrush(bg))
+            using (Pen pen = new Pen(border))
+            {
                 pevent.Graphics.FillPath(brush, path);
                 pevent.Graphics.DrawPath(pen, path);
-                TextRenderer.DrawText(pevent.Graphics, Text, Font, rect, ForeColor,
+                TextRenderer.DrawText(pevent.Graphics, Text, Font, rect, fg,
                     TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.EndEllipsis);
+                if (Enabled && (Focused || ContainsFocus))
+                {
+                    Rectangle focusRect = new Rectangle(3, 3, Width - 7, Height - 7);
+                    int focusRadius = Math.Max(1, radius - 2);
+                    using (GraphicsPath focusPath = RoundedPanel.BuildRoundRect(focusRect, focusRadius))
+                    using (Pen focusPen = new Pen(Color.FromArgb(147, 183, 255)))
+                    {
+                        focusPen.DashStyle = DashStyle.Dash;
+                        pevent.Graphics.DrawPath(focusPen, focusPath);
+                    }
+                }
             }
         }
     }
@@ -122,14 +183,41 @@ namespace ExchangeAuditTool
         private static readonly Color SteelDark = Color.FromArgb(64, 82, 105);
         private static readonly Color Accent = Color.FromArgb(66, 138, 247);
 
+        private static readonly Dictionary<string, Bitmap> _iconCache = new Dictionary<string, Bitmap>();
+        private static readonly object _iconLock = new object();
+
         public static Bitmap Render(string key, int size)
         {
             return Render(key, size, false);
         }
 
-        // White variant for selected nav buttons: recolors the standard glyph
-        // to white (alpha preserved). Keeps one drawing implementation.
+        // Cached: the GetPixel white-recolor + GDI redraw used to run on every
+        // SwitchPage via StyleNav (which disposes the old image). We cache the
+        // master frame and return a clone so the caller's Dispose pattern stays safe.
         public static Bitmap Render(string key, int size, bool white)
+        {
+            string cacheKey = ((key ?? "").ToLowerInvariant()) + "|" + size + "|" + white;
+            lock (_iconLock)
+            {
+                Bitmap cached;
+                if (_iconCache.TryGetValue(cacheKey, out cached))
+                    return new Bitmap(cached);
+            }
+            Bitmap fresh = RenderUncached(key, size, white);
+            lock (_iconLock)
+            {
+                Bitmap existing;
+                if (_iconCache.TryGetValue(cacheKey, out existing))
+                {
+                    fresh.Dispose();
+                    return new Bitmap(existing);
+                }
+                _iconCache[cacheKey] = new Bitmap(fresh);
+            }
+            return fresh;
+        }
+
+        private static Bitmap RenderUncached(string key, int size, bool white)
         {
             string k = (key ?? "").ToLowerInvariant();
             string glyph = Mdl2Glyph(k);

@@ -211,8 +211,8 @@ namespace ExchangeAuditTool
             extra.Add(new AuditOption("fullaccess", "FullAccess delegates - bulk Get-(EXO)MailboxPermission", "fullaccess", false));
             extra.Add(new AuditOption("sendas", "SendAs delegates - EXO: RecipientPermission / on-prem: ADPermission", "sendas", false));
             extra.Add(new AuditOption("grantsendonbehalf", "Send on Behalf (GrantSendOnBehalfTo, resolved to SMTP)", "grantsendonbehalf", false));
-            extra.Add(new AuditOption("mailboxsize", "Mailbox size in MB (Get-MailboxStatistics)", "mailboxsize", false));
-            extra.Add(new AuditOption("regional", "Regional config (Language, TimeZone) - per-mailbox, slower", "regional", false));
+            extra.Add(new AuditOption("mailboxsize", "Mailbox size in MB (Get-MailboxStatistics)", "mailboxsize", false).MarkSlow());
+            extra.Add(new AuditOption("regional", "Regional config (Language, TimeZone) - per-mailbox, slower", "regional", false).MarkSlow());
             section.AddGroup(extra);
 
             PsScriptHelpers.AddSizeGroup(section);

@@ -16,6 +16,7 @@ namespace ExchangeAuditTool
         public bool DefaultChecked;
         public bool DefOnline;
         public bool DefOnPrem;
+        public bool Slow;
 
         public AuditOption(string key, string label, string value, bool defaultChecked)
         {
@@ -39,6 +40,8 @@ namespace ExchangeAuditTool
             o.DefOnPrem = defOnPrem;
             return o;
         }
+
+        public AuditOption MarkSlow() { Slow = true; return this; }
     }
 
     internal sealed class AuditOptionGroup
@@ -48,6 +51,7 @@ namespace ExchangeAuditTool
         public string Hint;
         public GroupMode Mode;
         public int Columns;
+        public bool Slow;
         public List<AuditOption> Options = new List<AuditOption>();
 
         public AuditOptionGroup(string key, string title, GroupMode mode)
@@ -60,6 +64,7 @@ namespace ExchangeAuditTool
 
         public AuditOptionGroup Add(AuditOption option) { Options.Add(option); return this; }
         public AuditOptionGroup AddProp(string name, bool def) { Options.Add(AuditOption.Prop(name, def)); return this; }
+        public AuditOptionGroup MarkSlow() { Slow = true; return this; }
     }
 
     internal sealed class AuditSelection

@@ -102,7 +102,7 @@ namespace ExchangeAuditTool
             perms.Add(new AuditOption("automapping", "AutoMapping delegates (msExchDelegateListLink)", "automapping", false));
             section.AddGroup(perms);
 
-            var folder = new AuditOptionGroup("folderperms", "Folder permissions (per-mailbox, slower)", GroupMode.MultiCheck);
+            var folder = new AuditOptionGroup("folderperms", "Folder permissions (per-mailbox, slower)", GroupMode.MultiCheck).MarkSlow();
             folder.Hint = "Get-MailboxFolderPermission on the chosen folder(s); non-default entries only.";
             folder.Columns = 2;
             folder.Add(new AuditOption("calendar", "Calendar", "Calendar", false));
@@ -111,9 +111,9 @@ namespace ExchangeAuditTool
 
             var extra = new AuditOptionGroup("complementary", "Complementary data", GroupMode.MultiCheck);
             extra.Columns = 1;
-            extra.Add(new AuditOption("mailboxsize", "Mailbox size in MB (Get-MailboxStatistics)", "mailboxsize", false));
+            extra.Add(new AuditOption("mailboxsize", "Mailbox size in MB (Get-MailboxStatistics)", "mailboxsize", false).MarkSlow());
             extra.Add(new AuditOption("accountstatus", "Account activated / disabled (Get-User)", "accountstatus", false));
-            extra.Add(new AuditOption("regional", "Regional config (Language, TimeZone) - per-mailbox, slower", "regional", false));
+            extra.Add(new AuditOption("regional", "Regional config (Language, TimeZone) - per-mailbox, slower", "regional", false).MarkSlow());
             section.AddGroup(extra);
 
             PsScriptHelpers.AddSizeGroup(section);
@@ -324,7 +324,7 @@ namespace ExchangeAuditTool
             var account = new AuditOptionGroup("account", "Account", GroupMode.MultiCheck); account.Columns = 2;
             account.AddProp("RoomMailboxAccountEnabled", true);
             account.Add(new AuditOption("accountstatus", "Account activated / disabled (Get-User)", "accountstatus", false));
-            account.Add(new AuditOption("mailboxsize", "Mailbox size in MB (Get-MailboxStatistics)", "mailboxsize", false));
+            account.Add(new AuditOption("mailboxsize", "Mailbox size in MB (Get-MailboxStatistics)", "mailboxsize", false).MarkSlow());
             section.AddGroup(account);
 
             var custom = new AuditOptionGroup("custom", "Tags / custom", GroupMode.MultiCheck); custom.Columns = 2;

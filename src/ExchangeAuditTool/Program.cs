@@ -10,8 +10,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyProduct("Exchange Audit Tool")]
 [assembly: System.Reflection.AssemblyDescription("Modern GUI to run Exchange Online and on-premises audit exports.")]
 [assembly: System.Reflection.AssemblyCompany("Prodware")]
-[assembly: System.Reflection.AssemblyVersion("1.2.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.2.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.2.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.2.1.0")]
 
 namespace ExchangeAuditTool
 {
@@ -78,7 +78,7 @@ namespace ExchangeAuditTool
         private readonly Label footerStatus = new Label();
         private readonly TextBox logBox = new TextBox();
         private readonly ProgressBar progress = new ProgressBar();
-        private Button clearLogButton;
+        private ModernButton clearLogButton;
 
         private readonly List<Button> navButtons = new List<Button>();
         private Control[] pages;
@@ -204,6 +204,7 @@ namespace ExchangeAuditTool
 
         private static Button NewWindowButton(string glyph)
         {
+            string name = glyph == "close" ? "Close" : glyph == "max" ? "Maximize or restore" : "Minimize";
             var b = new Button
             {
                 Width = 46,
@@ -211,7 +212,9 @@ namespace ExchangeAuditTool
                 BackColor = Color.FromArgb(8, 18, 30),
                 Image = UiAssets.Render(glyph, 14),
                 ImageAlign = ContentAlignment.MiddleCenter,
-                TabStop = false
+                TabStop = false,
+                AccessibleName = name,
+                AccessibleDescription = name + " the Exchange Audit Tool window"
             };
             b.FlatAppearance.BorderSize = 0;
             b.FlatAppearance.MouseOverBackColor = Color.FromArgb(27, 41, 58);
@@ -379,7 +382,7 @@ namespace ExchangeAuditTool
         {
             var btn = new Button
             {
-                Size = new Size(230, 28),
+                Size = new Size(230, 32),
                 FlatStyle = FlatStyle.Flat,
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Color.FromArgb(66, 138, 247),
@@ -420,7 +423,7 @@ namespace ExchangeAuditTool
                     cat.Header.Location = new Point(4, y);
                     cat.Header.Text = CategoryHeaderText(cat);
                 }
-                y += 30;
+                y += 34;
 
                 foreach (Button b in cat.Buttons)
                 {
@@ -499,19 +502,18 @@ namespace ExchangeAuditTool
         private RoundedPanel BuildLogCard()
         {
             var card = new RoundedPanel { Dock = DockStyle.Bottom, Height = 150, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(12, 8, 12, 10) };
-            var head = new Panel { Dock = DockStyle.Top, Height = 28, BackColor = UiTheme.Surface };
+            var head = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = UiTheme.Surface };
             var title = new Label { Text = "Activity Log", Dock = DockStyle.Left, Width = 180, ForeColor = UiTheme.Text, Font = new Font("Segoe UI Semibold", 9.5F), TextAlign = ContentAlignment.MiddleLeft };
-            clearLogButton = new Button { Text = "Clear", Dock = DockStyle.Right, Width = 70, FlatStyle = FlatStyle.Flat, BackColor = UiTheme.Surface2, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F) };
-            clearLogButton.FlatAppearance.BorderColor = UiTheme.Border;
+            clearLogButton = new ModernButton { Text = "Clear", Dock = DockStyle.Right, Width = 70, Height = 32, Padding = new Padding(0) };
             clearLogButton.Click += delegate { logBox.Clear(); };
             head.Controls.Add(clearLogButton);
             head.Controls.Add(title);
 
-            logBox.Dock = DockStyle.Fill; logBox.Multiline = true; logBox.ScrollBars = ScrollBars.Vertical; logBox.ReadOnly = true;
+            logBox.Dock = DockStyle.Fill; logBox.Multiline = true; logBox.ScrollBars = ScrollBars.Both; logBox.ReadOnly = true;
             logBox.BorderStyle = BorderStyle.None; logBox.WordWrap = false; logBox.BackColor = Color.FromArgb(6, 15, 26);
             logBox.ForeColor = Color.FromArgb(187, 198, 211); logBox.Font = new Font("Consolas", 8.5F);
 
-            progress.Dock = DockStyle.Bottom; progress.Height = 4; progress.Style = ProgressBarStyle.Blocks;
+            progress.Dock = DockStyle.Bottom; progress.Height = 4; progress.Style = ProgressBarStyle.Marquee; progress.MarqueeAnimationSpeed = 30; progress.Visible = false;
 
             card.Controls.Add(logBox);
             card.Controls.Add(head);
@@ -615,7 +617,8 @@ namespace ExchangeAuditTool
         internal void SetBusy(bool busy)
         {
             if (InvokeRequired) { BeginInvoke(new Action<bool>(SetBusy), busy); return; }
-            progress.Style = busy ? ProgressBarStyle.Marquee : ProgressBarStyle.Blocks;
+            progress.Visible = busy;
+            progress.Style = ProgressBarStyle.Marquee;
             UseWaitCursor = busy;
         }
     }

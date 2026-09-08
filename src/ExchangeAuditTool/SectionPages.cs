@@ -5,6 +5,7 @@ using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -55,6 +56,49 @@ namespace ExchangeAuditTool
             return redacted;
         }
 
+        private static bool IsValidUpn(string upn)
+        {
+            if (string.IsNullOrEmpty(upn) || upn.IndexOf(' ') >= 0) return false;
+            int at = upn.IndexOf('@');
+            if (at <= 0 || at != upn.LastIndexOf('@') || at == upn.Length - 1) return false;
+            return upn.IndexOf('.', at) > at + 1 && upn.Length - upn.LastIndexOf('.') > 2;
+        }
+
+        private static bool IsValidThumbprint(string thumb)
+        {
+            if (string.IsNullOrEmpty(thumb) || thumb.Length != 40) return false;
+            foreach (char c in thumb)
+            {
+                bool hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+                if (!hex) return false;
+            }
+            return true;
+        }
+
+        private static bool IsValidHostname(string host)
+        {
+            if (string.IsNullOrEmpty(host) || host.Length < 3 || host.Length > 253) return false;
+            if (host.IndexOf(' ') >= 0 || host.IndexOf('/') >= 0 || host.IndexOf('\\') >= 0) return false;
+            foreach (char c in host)
+            {
+                bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                          (c >= '0' && c <= '9') || c == '-' || c == '.';
+                if (!ok) return false;
+            }
+            return host.IndexOf('.') > 0;
+        }
+
+        private static bool IsValidCsvPath(string csv)
+        {
+            if (string.IsNullOrEmpty(csv)) return false;
+            if (csv.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return false;
+            string file;
+            try { file = Path.GetFileName(csv); }
+            catch { return false; }
+            if (string.IsNullOrEmpty(file) || file.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return false;
+            return csv.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
+        }
+
         private sealed class SectionUi
         {
             public AuditSection Section;
@@ -75,26 +119,26 @@ namespace ExchangeAuditTool
         private Control BuildConnectionPage()
         {
             var page = new Panel { BackColor = UiTheme.Window, Padding = new Padding(0, 0, 0, 10), AutoScroll = true };
-            var card = new RoundedPanel { Dock = DockStyle.Top, Height = 570, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(18, 14, 18, 14) };
+            var card = new RoundedPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(18, 14, 18, 14) };
 
             var head = NewSectionHeader("connect", "Exchange connection", "Connect once - the session stays open until you close the app.");
 
-            var modeGroup = new Panel { Dock = DockStyle.Top, Height = 66, BackColor = UiTheme.Surface };
+            var modeGroup = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(0, 4, 0, 4) };
             var rInteractive = NewRadio("Exchange Online (interactive)", true);
             var rApp = NewRadio("Exchange Online (app-only cert)", false);
             var rLocal = NewRadio("On-premises (run on Exchange server)", false);
             var rRemote = NewRadio("On-premises (remote PowerShell)", false);
-            rInteractive.Location = new Point(0, 6); rInteractive.Width = 250;
-            rApp.Location = new Point(260, 6); rApp.Width = 260;
-            rLocal.Location = new Point(0, 36); rLocal.Width = 300;
-            rRemote.Location = new Point(300, 36); rRemote.Width = 300;
+            rInteractive.Margin = new Padding(0, 4, 16, 4);
+            rApp.Margin = new Padding(0, 4, 16, 4);
+            rLocal.Margin = new Padding(0, 4, 16, 4);
+            rRemote.Margin = new Padding(0, 4, 0, 4);
             modeGroup.Controls.Add(rInteractive); modeGroup.Controls.Add(rApp);
             modeGroup.Controls.Add(rLocal); modeGroup.Controls.Add(rRemote);
 
-            var moduleRow = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = UiTheme.Surface };
+            var moduleRow = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = UiTheme.Surface };
             var moduleLabel = new Label { Text = "EXO module:", Dock = DockStyle.Left, Width = 90, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
             _exoModuleStatus = new Label { Text = "checking...", Dock = DockStyle.Left, Width = 300, ForeColor = UiTheme.Orange, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 8.8F) };
-            var checkBtn = new ModernButton { Text = "Re-check", Dock = DockStyle.Right, Width = 96, Height = 26, Padding = new Padding(0) };
+            var checkBtn = new ModernButton { Text = "Re-check", Dock = DockStyle.Right, Width = 96, Height = 32, Padding = new Padding(0) };
             checkBtn.Click += delegate { CheckExoModuleAsync(); };
             moduleRow.Controls.Add(_exoModuleStatus);
             moduleRow.Controls.Add(moduleLabel);
@@ -106,8 +150,8 @@ namespace ExchangeAuditTool
             connectedRow.Controls.Add(_connectedAs);
             connectedRow.Controls.Add(connectedLabel);
 
-            var logCmdRow = new Panel { Dock = DockStyle.Top, Height = 28, BackColor = UiTheme.Surface };
-            var cbLogCmd = new CheckBox { Text = "Log executed PowerShell commands in the Activity Log", Checked = _logCommands, AutoSize = true, Location = new Point(0, 4), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
+            var logCmdRow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(0, 4, 0, 4) };
+            var cbLogCmd = new CheckBox { Text = "Log executed PowerShell commands in the Activity Log", Checked = _logCommands, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F), Margin = new Padding(0, 0, 0, 0) };
             cbLogCmd.CheckedChanged += delegate { _logCommands = cbLogCmd.Checked; };
             logCmdRow.Controls.Add(cbLogCmd);
 
@@ -118,8 +162,8 @@ namespace ExchangeAuditTool
 
             var rowUpn = NewLabeledRow("User principal name", tbUpn);
 
-            var rowDevice = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = UiTheme.Surface };
-            var cbDevice = new CheckBox { Text = "Open external browser for sign-in (disable WAM) - recommended", Checked = ConnectionSettings.DisableWam, AutoSize = true, Location = new Point(150, 8), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
+            var rowDevice = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(150, 4, 0, 4) };
+            var cbDevice = new CheckBox { Text = "Open external browser for sign-in (disable WAM) - recommended", Checked = ConnectionSettings.DisableWam, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F), Margin = new Padding(0, 0, 0, 0) };
             rowDevice.Controls.Add(cbDevice);
 
             var rowAppId = NewLabeledRow("Application (client) ID", tbAppId);
@@ -136,11 +180,11 @@ namespace ExchangeAuditTool
             var rowRemoteServer = NewLabeledRow("Exchange server (FQDN)", tbRemoteServer);
             var rowRemoteUser = NewLabeledRow("Username (optional)", tbRemoteUser);
 
-            var rowRemoteAuth = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = UiTheme.Surface };
-            var authLabel = new Label { Text = "Authentication", Dock = DockStyle.Left, Width = 150, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
-            var rKerb = new RadioButton { Text = "Kerberos (domain-joined)", Checked = true, AutoSize = true, Location = new Point(154, 10), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
-            var rBasic = new RadioButton { Text = "Basic (off-domain)", Checked = false, AutoSize = true, Location = new Point(330, 10), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
-            var cbHttps = new CheckBox { Text = "Use HTTPS", Checked = false, AutoSize = true, Location = new Point(470, 10), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
+            var rowRemoteAuth = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(0, 4, 0, 4) };
+            var authLabel = new Label { Text = "Authentication", Width = 150, Height = 24, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F), Margin = new Padding(0, 4, 0, 4) };
+            var rKerb = new RadioButton { Text = "Kerberos (domain-joined)", Checked = true, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F), Margin = new Padding(4, 6, 16, 4) };
+            var rBasic = new RadioButton { Text = "Basic (off-domain)", Checked = false, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F), Margin = new Padding(0, 6, 16, 4) };
+            var cbHttps = new CheckBox { Text = "Use HTTPS", Checked = false, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F), Margin = new Padding(0, 6, 0, 4) };
             rowRemoteAuth.Controls.Add(cbHttps);
             rowRemoteAuth.Controls.Add(rBasic);
             rowRemoteAuth.Controls.Add(rKerb);
@@ -154,7 +198,7 @@ namespace ExchangeAuditTool
             // Keep Basic and HTTPS in sync (Basic should be used over HTTPS).
             rBasic.CheckedChanged += delegate { if (rBasic.Checked) cbHttps.Checked = true; };
 
-            var fields = new Panel { Dock = DockStyle.Top, Height = 220, BackColor = UiTheme.Surface, Padding = new Padding(0, 8, 0, 0) };
+            var fields = new Panel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, Padding = new Padding(0, 8, 0, 0) };
             fields.Controls.Add(rowLocalInfo);
             fields.Controls.Add(rowRemoteInfo);
             fields.Controls.Add(rowRemoteAuth);
@@ -186,12 +230,12 @@ namespace ExchangeAuditTool
             rLocal.CheckedChanged += delegate { applyMode(); };
             rRemote.CheckedChanged += delegate { applyMode(); };
 
-            var buttons = new Panel { Dock = DockStyle.Bottom, Height = 48, BackColor = UiTheme.Surface };
-            var save = new ModernButton { Text = "Connect", Width = 160, Height = 36, Location = new Point(0, 8) };
+            var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(0, 8, 0, 0) };
+            var save = new ModernButton { Text = "Connect", Width = 160, Height = 36, Margin = new Padding(0, 0, 8, 8) };
             save.NormalColor = UiTheme.Blue; save.BackColor = UiTheme.Blue; save.ForeColor = Color.White;
-            var installMod = new ModernButton { Text = "Install EXO module", Width = 170, Height = 36, Location = new Point(170, 8) };
-            var disconnectBtn = new ModernButton { Text = "Disconnect", Width = 120, Height = 36, Location = new Point(348, 8) };
-            _connStatus = new Label { Text = ConnectionSettings.Summary(), Location = new Point(478, 16), AutoSize = true, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F) };
+            var installMod = new ModernButton { Text = "Install EXO module", Width = 170, Height = 36, Margin = new Padding(0, 0, 8, 8) };
+            var disconnectBtn = new ModernButton { Text = "Disconnect", Width = 120, Height = 36, Margin = new Padding(0, 0, 8, 8) };
+            _connStatus = new Label { Text = ConnectionSettings.Summary(), AutoSize = true, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F), Margin = new Padding(8, 10, 0, 8) };
             buttons.Controls.Add(save); buttons.Controls.Add(installMod); buttons.Controls.Add(disconnectBtn); buttons.Controls.Add(_connStatus);
 
             save.Click += async delegate
@@ -202,25 +246,69 @@ namespace ExchangeAuditTool
                     await RunPowerShellCaptureAsync(ConnectionSettings.BuildDisconnect());
                 }
 
+                string upn = tbUpn.Text.Trim();
+                string appId = tbAppId.Text.Trim();
+                string org = tbOrg.Text.Trim();
+                string thumb = tbThumb.Text.Trim().Replace(" ", "").Replace(":", "");
+                string remoteServer = tbRemoteServer.Text.Trim();
+                string remoteUser = tbRemoteUser.Text.Trim();
+
+                if (rInteractive.Checked && upn.Length > 0 && !IsValidUpn(upn))
+                {
+                    Warn("That UPN does not look like an email address (expected user@domain).");
+                    tbUpn.Focus();
+                    tbUpn.SelectAll();
+                    return;
+                }
+                if (rApp.Checked)
+                {
+                    Guid parsedAppId;
+                    if (string.IsNullOrEmpty(appId) || !Guid.TryParse(appId, out parsedAppId))
+                    {
+                        Warn("Enter a valid Application (client) ID (GUID).");
+                        tbAppId.Focus();
+                        tbAppId.SelectAll();
+                        return;
+                    }
+                    if (string.IsNullOrEmpty(org) || org.IndexOf('.') < 0 || org.IndexOf(' ') >= 0)
+                    {
+                        Warn("Enter the tenant organization (e.g. contoso.onmicrosoft.com).");
+                        tbOrg.Focus();
+                        tbOrg.SelectAll();
+                        return;
+                    }
+                    if (!IsValidThumbprint(thumb))
+                    {
+                        Warn("Enter a valid 40-character certificate thumbprint (hex).");
+                        tbThumb.Focus();
+                        tbThumb.SelectAll();
+                        return;
+                    }
+                }
+                if (rRemote.Checked)
+                {
+                    if (string.IsNullOrEmpty(remoteServer) || !IsValidHostname(remoteServer))
+                    {
+                        Warn("Enter the Exchange server FQDN for the remote PowerShell connection.");
+                        tbRemoteServer.Focus();
+                        tbRemoteServer.SelectAll();
+                        return;
+                    }
+                }
+
                 ConnectionSettings.Mode = rInteractive.Checked ? ConnectionMode.ExchangeOnlineInteractive
                                         : rApp.Checked ? ConnectionMode.ExchangeOnlineApp
                                         : rLocal.Checked ? ConnectionMode.OnPremisesLocal
                                         : ConnectionMode.OnPremisesRemote;
-                ConnectionSettings.Upn = tbUpn.Text.Trim();
+                ConnectionSettings.Upn = upn;
                 ConnectionSettings.DisableWam = cbDevice.Checked;
-                ConnectionSettings.AppId = tbAppId.Text.Trim();
-                ConnectionSettings.Organization = tbOrg.Text.Trim();
-                ConnectionSettings.CertThumbprint = tbThumb.Text.Trim();
-                ConnectionSettings.RemoteServer = tbRemoteServer.Text.Trim();
-                ConnectionSettings.RemoteUser = tbRemoteUser.Text.Trim();
+                ConnectionSettings.AppId = appId;
+                ConnectionSettings.Organization = org;
+                ConnectionSettings.CertThumbprint = thumb;
+                ConnectionSettings.RemoteServer = remoteServer;
+                ConnectionSettings.RemoteUser = remoteUser;
                 ConnectionSettings.RemoteAuth = rBasic.Checked ? RemoteAuthMode.Basic : RemoteAuthMode.Kerberos;
                 ConnectionSettings.RemoteUseHttps = cbHttps.Checked;
-
-                if (rRemote.Checked && string.IsNullOrEmpty(ConnectionSettings.RemoteServer))
-                {
-                    Warn("Enter the Exchange server FQDN for the remote PowerShell connection.");
-                    return;
-                }
 
                 _connStatus.Text = ConnectionSettings.Summary();
 
@@ -371,9 +459,23 @@ namespace ExchangeAuditTool
 
             var optionsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(16, 14, 16, 14), AutoScroll = true };
 
-            var headerRow = new Panel { Dock = DockStyle.Top, Height = 26, BackColor = UiTheme.Surface };
+            var headerRow = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = UiTheme.Surface };
             var scopeBadge = new Label { Text = ScopeText(section.Scope), Dock = DockStyle.Left, Width = 240, ForeColor = UiTheme.Orange, Font = new Font("Segoe UI Semibold", 8F), TextAlign = ContentAlignment.MiddleLeft };
-            var selectAllBtn = new ModernButton { Text = "Select all", Dock = DockStyle.Right, Width = 110, Height = 24, Padding = new Padding(0) };
+            var selectAllBtn = new ModernButton { Text = "Select all", Dock = DockStyle.Right, Width = 130, Height = 32, Padding = new Padding(0) };
+            Action updateSelectAll = delegate
+            {
+                int total = 0;
+                int on = 0;
+                foreach (var kv in ui.Checks)
+                    foreach (CheckBox cb in kv.Value)
+                    {
+                        total++;
+                        if (cb.Checked) on++;
+                    }
+                if (total > 0 && on == total) selectAllBtn.Text = "Deselect all";
+                else if (on == 0) selectAllBtn.Text = "Select all";
+                else selectAllBtn.Text = "Select all (" + on + "/" + total + ")";
+            };
             selectAllBtn.Click += delegate
             {
                 bool anyUnchecked = false;
@@ -384,7 +486,7 @@ namespace ExchangeAuditTool
                 foreach (var kv in ui.Checks)
                     foreach (CheckBox cb in kv.Value)
                         cb.Checked = target;
-                selectAllBtn.Text = target ? "Deselect all" : "Select all";
+                updateSelectAll();
             };
             headerRow.Controls.Add(selectAllBtn);
             headerRow.Controls.Add(scopeBadge);
@@ -395,7 +497,75 @@ namespace ExchangeAuditTool
                 built.Add(BuildOptionGroup(ui, grp));
             for (int i = built.Count - 1; i >= 0; i--) groupsHost.Controls.Add(built[i]);
 
+            var filterRow = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = UiTheme.Surface };
+            var filterLabel = new Label { Text = "Filter", Dock = DockStyle.Left, Width = 60, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
+            var filterHost = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 7, 0, 7), BackColor = filterRow.BackColor };
+            var tbFilter = NewField();
+            tbFilter.Dock = DockStyle.Fill;
+            filterHost.Controls.Add(tbFilter);
+            filterRow.Controls.Add(filterHost);
+            filterRow.Controls.Add(filterLabel);
+            Action applyFilter = delegate
+            {
+                string f = (tbFilter.Text ?? "").Trim().ToLowerInvariant();
+                if (f.Length == 0)
+                {
+                    foreach (var kv in ui.Checks)
+                        foreach (CheckBox cb in kv.Value) cb.ForeColor = UiTheme.Text;
+                    foreach (var kv in ui.Radios)
+                        foreach (RadioButton rb in kv.Value) rb.ForeColor = UiTheme.Text;
+                    foreach (Control card in built) card.Visible = true;
+                    return;
+                }
+                foreach (var kv in ui.Checks)
+                    foreach (CheckBox cb in kv.Value)
+                    {
+                        var opt = cb.Tag as AuditOption;
+                        string hay = ((opt != null ? opt.Label : cb.Text) ?? "").ToLowerInvariant();
+                        cb.ForeColor = hay.Contains(f) ? UiTheme.Text : UiTheme.Muted;
+                    }
+                foreach (var kv in ui.Radios)
+                    foreach (RadioButton rb in kv.Value)
+                    {
+                        var opt = rb.Tag as AuditOption;
+                        string hay = ((opt != null ? opt.Label : rb.Text) ?? "").ToLowerInvariant();
+                        rb.ForeColor = hay.Contains(f) ? UiTheme.Text : UiTheme.Muted;
+                    }
+                foreach (Control card in built)
+                {
+                    bool anyMatch = false;
+                    foreach (Control inner in card.Controls)
+                    {
+                        var table = inner as TableLayoutPanel;
+                        if (table == null) continue;
+                        foreach (Control c in table.Controls)
+                        {
+                            var cb = c as CheckBox;
+                            if (cb != null)
+                            {
+                                var opt = cb.Tag as AuditOption;
+                                string hay = ((opt != null ? opt.Label : cb.Text) ?? "").ToLowerInvariant();
+                                if (hay.Contains(f)) { anyMatch = true; break; }
+                                continue;
+                            }
+                            var rb = c as RadioButton;
+                            if (rb != null)
+                            {
+                                var opt = rb.Tag as AuditOption;
+                                string hay = ((opt != null ? opt.Label : rb.Text) ?? "").ToLowerInvariant();
+                                if (hay.Contains(f)) { anyMatch = true; break; }
+                            }
+                        }
+                        if (anyMatch) break;
+                    }
+                    card.Visible = anyMatch;
+                }
+            };
+            tbFilter.TextChanged += delegate { applyFilter(); };
+            _optionTip.SetToolTip(tbFilter, "Type to highlight matching options; groups without matches are hidden");
+
             optionsCard.Controls.Add(groupsHost);
+            optionsCard.Controls.Add(filterRow);
             optionsCard.Controls.Add(headerRow);
 
             var outputRow = NewLabeledRow("Output CSV", null);
@@ -429,15 +599,16 @@ namespace ExchangeAuditTool
 
             foreach (var kv in ui.Checks)
                 foreach (CheckBox cb in kv.Value)
-                    cb.CheckedChanged += delegate { slowHint.Visible = HasSlowOptions(ui); };
+                    cb.CheckedChanged += delegate { slowHint.Visible = HasSlowOptions(ui); updateSelectAll(); };
             slowHint.Visible = HasSlowOptions(ui);
+            updateSelectAll();
 
             var resultsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(12, 10, 12, 12) };
-            var rHead = new Panel { Dock = DockStyle.Top, Height = 30, BackColor = UiTheme.Surface };
+            var rHead = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = UiTheme.Surface };
             var rTitle = new Label { Text = "Results preview", Dock = DockStyle.Left, Width = 160, ForeColor = UiTheme.Text, Font = new Font("Segoe UI Semibold", 9.5F), TextAlign = ContentAlignment.MiddleLeft };
-            ui.OpenButton = new ModernButton { Text = "Open CSV", Dock = DockStyle.Right, Width = 96, Height = 26, Padding = new Padding(0), Enabled = false };
+            ui.OpenButton = new ModernButton { Text = "Open CSV", Dock = DockStyle.Right, Width = 96, Height = 32, Padding = new Padding(0), Enabled = false };
             ui.OpenButton.Click += delegate { if (!string.IsNullOrEmpty(ui.LastCsv) && File.Exists(ui.LastCsv)) OpenPath(ui.LastCsv); };
-            var folderBtn = new ModernButton { Text = "Folder", Dock = DockStyle.Right, Width = 70, Height = 26, Padding = new Padding(0) };
+            var folderBtn = new ModernButton { Text = "Folder", Dock = DockStyle.Right, Width = 70, Height = 32, Padding = new Padding(0) };
             folderBtn.Click += delegate
             {
                 if (string.IsNullOrEmpty(ui.LastCsv)) return;
@@ -452,7 +623,7 @@ namespace ExchangeAuditTool
             rHead.Controls.Add(folderBtn);
             rHead.Controls.Add(rTitle);
 
-            ui.ResultInfo = new Label { Text = "No results yet.", Dock = DockStyle.Top, Height = 22, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.3F) };
+            ui.ResultInfo = new Label { Text = "No results yet.", Dock = DockStyle.Top, Height = 22, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.3F), AutoEllipsis = true };
 
             ui.Grid = new DataGridView
             {
@@ -481,7 +652,9 @@ namespace ExchangeAuditTool
             resultsCard.Controls.Add(ui.Grid);
             resultsCard.Controls.Add(ui.ResultInfo);
             resultsCard.Controls.Add(rHead);
-            ui.EmptyState = new Label { Text = "No results yet." + Environment.NewLine + "Pick options and press RUN AUDIT.", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 10F), BackColor = Color.FromArgb(6, 15, 26) };
+            ui.EmptyState = new Label { Text = "No results yet." + Environment.NewLine + "Pick options and press RUN AUDIT.", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 10F), BackColor = Color.FromArgb(6, 15, 26), Cursor = Cursors.Hand };
+            ui.EmptyState.Click += delegate { if (ui.RunButton.Enabled) ui.RunButton.Focus(); };
+            _optionTip.SetToolTip(ui.EmptyState, "Pick options on the left, then press RUN AUDIT" + Environment.NewLine + "Click to focus the Run button.");
             resultsCard.Controls.Add(ui.EmptyState);
             ui.EmptyState.BringToFront();
             rightColumn.Controls.Add(resultsCard);
@@ -510,17 +683,22 @@ namespace ExchangeAuditTool
 
         // Per-mailbox / per-folder lookups (regional config, statistics, folder
         // permissions) dominate runtime. Warn before the user starts a slow run.
+        // Slow is declared on the model (AuditOption.Slow / AuditOptionGroup.Slow),
+        // not string-matched here, so new slow options can't silently miss the hint.
         private static bool HasSlowOptions(SectionUi ui)
         {
             foreach (var kv in ui.Checks)
             {
-                bool groupSlow = kv.Key == "folderperms" || kv.Key == "stats";
+                bool groupSlow = false;
+                if (ui.Section != null && ui.Section.Groups != null)
+                    foreach (AuditOptionGroup g in ui.Section.Groups)
+                        if (g.Key == kv.Key) { groupSlow = g.Slow; break; }
                 foreach (CheckBox cb in kv.Value)
                 {
                     if (!cb.Checked) continue;
                     if (groupSlow) return true;
-                    string v = ((AuditOption)cb.Tag).Value;
-                    if (v == "regional" || v == "mailboxsize") return true;
+                    var opt = cb.Tag as AuditOption;
+                    if (opt != null && opt.Slow) return true;
                 }
             }
             return false;
@@ -590,7 +768,13 @@ namespace ExchangeAuditTool
         {
             AuditSection section = ui.Section;
             string csv = ui.OutputPath.Text.Trim();
-            if (string.IsNullOrEmpty(csv)) { Warn("Choose an output CSV path first."); return; }
+            if (!IsValidCsvPath(csv))
+            {
+                Warn("Choose a valid output CSV path (e.g. C:\\Exports\\audit.csv).");
+                ui.OutputPath.Focus();
+                ui.OutputPath.SelectAll();
+                return;
+            }
 
             var selection = new AuditSelection();
             foreach (var kv in ui.Checks)
@@ -616,9 +800,15 @@ namespace ExchangeAuditTool
             ui.CancelButton.Enabled = true;
             SetBusy(true);
             var sw = System.Diagnostics.Stopwatch.StartNew();
+            int streamedLines = 0;
             using (var tick = new System.Windows.Forms.Timer { Interval = 500 })
             {
-                tick.Tick += delegate { SetFooter("Running " + section.NavTitle + "... " + sw.Elapsed.ToString("mm\\:ss"), UiTheme.Orange); };
+                tick.Tick += delegate
+                {
+                    string elapsed = sw.Elapsed.ToString("mm\\:ss");
+                    int n = Interlocked.CompareExchange(ref streamedLines, 0, 0);
+                    SetFooter("Running " + section.NavTitle + "... " + elapsed + " · " + n + " lines", UiTheme.Orange);
+                };
                 tick.Start();
                 try
                 {
@@ -635,7 +825,14 @@ namespace ExchangeAuditTool
                     catch { }
                     try { if (File.Exists(csv)) File.Delete(csv); } catch { }
 
-                    var result = await RunPowerShellScriptAsync(full);
+                    var result = await Task.Run(delegate
+                    {
+                        return _ps.Execute(full, 1800000, delegate (string line)
+                        {
+                            Interlocked.Increment(ref streamedLines);
+                            AppendLog(line);
+                        });
+                    });
                     sw.Stop();
 
                     if (result.ExitCode == 0 && File.Exists(csv))
@@ -649,9 +846,9 @@ namespace ExchangeAuditTool
                         catch { size = "?"; }
                         string took = sw.Elapsed.ToString("mm\\:ss");
                         if (total > 200)
-                            ui.ResultInfo.Text = "✓ Exported " + total + " rows (" + size + ") in " + took + " (previewing first 200).";
+                            SetResult(ui, "✓ Exported " + total + " rows (" + size + ") in " + took + " (previewing first 200). Full path: " + csv, UiTheme.Green);
                         else
-                            ui.ResultInfo.Text = "✓ Exported to " + Path.GetFileName(csv) + " (" + size + ") in " + took + "  -  " + previewed + " row(s) previewed.";
+                            SetResult(ui, "✓ Exported to " + Path.GetFileName(csv) + " (" + size + ") in " + took + "  -  " + previewed + " row(s) previewed. Full path: " + csv, UiTheme.Green);
                         ui.EmptyState.Visible = total == 0;
                         ui.ResultInfo.ForeColor = UiTheme.Green;
                         SetFooter(section.NavTitle + " done in " + took, UiTheme.Green);
@@ -659,14 +856,12 @@ namespace ExchangeAuditTool
                     }
                     else if (result.Output.Contains("[cancelled by user]"))
                     {
-                        ui.ResultInfo.Text = "✗ Cancelled by user after " + sw.Elapsed.ToString("mm\\:ss") + " - partial output discarded.";
-                        ui.ResultInfo.ForeColor = UiTheme.Orange;
+                        SetResult(ui, "✗ Cancelled by user after " + sw.Elapsed.ToString("mm\\:ss") + " - partial output discarded.", UiTheme.Orange);
                         SetFooter(section.NavTitle + " cancelled", UiTheme.Orange);
                     }
                     else
                     {
-                        ui.ResultInfo.Text = "✗ Run failed in " + sw.Elapsed.ToString("mm\\:ss") + " - see the activity log.";
-                        ui.ResultInfo.ForeColor = UiTheme.Red;
+                        SetResult(ui, "✗ Run failed in " + sw.Elapsed.ToString("mm\\:ss") + " - see the activity log.", UiTheme.Red);
                         SetFooter(section.NavTitle + " failed", UiTheme.Red);
                     }
                 }
@@ -700,6 +895,13 @@ namespace ExchangeAuditTool
             if (bytes < 1024) return bytes + " B";
             if (bytes < 1048576) return (bytes / 1024) + " KB";
             return (bytes / 1048576.0).ToString("0.0") + " MB";
+        }
+
+        private void SetResult(SectionUi ui, string text, Color color)
+        {
+            ui.ResultInfo.Text = text;
+            ui.ResultInfo.ForeColor = color;
+            _optionTip.SetToolTip(ui.ResultInfo, text);
         }
 
         private Task<PsResult> RunPowerShellCaptureAsync(string command)
