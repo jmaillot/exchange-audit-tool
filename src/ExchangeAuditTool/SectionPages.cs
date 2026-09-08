@@ -584,7 +584,9 @@ namespace ExchangeAuditTool
             resultsCard.Controls.Add(ui.Grid);
             resultsCard.Controls.Add(ui.ResultInfo);
             resultsCard.Controls.Add(rHead);
-            ui.EmptyState = new Label { Text = "No results yet." + Environment.NewLine + "Pick options and press RUN AUDIT.", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 10F), BackColor = Color.FromArgb(6, 15, 26) };
+            ui.EmptyState = new Label { Text = "No results yet." + Environment.NewLine + "Pick options and press RUN AUDIT.", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 10F), BackColor = Color.FromArgb(6, 15, 26), Cursor = Cursors.Hand };
+            ui.EmptyState.Click += delegate { if (ui.RunButton.Enabled) ui.RunButton.Focus(); };
+            _optionTip.SetToolTip(ui.EmptyState, "Pick options on the left, then press RUN AUDIT" + Environment.NewLine + "Click to focus the Run button.");
             resultsCard.Controls.Add(ui.EmptyState);
             ui.EmptyState.BringToFront();
             rightColumn.Controls.Add(resultsCard);
