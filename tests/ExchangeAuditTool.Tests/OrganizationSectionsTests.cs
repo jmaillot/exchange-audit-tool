@@ -17,7 +17,7 @@ namespace ExchangeAuditTool.Tests
         public void Registry_ContainsNewSections()
         {
             AuditRegistry.BuildAll();
-            Assert.Equal(19, AuditRegistry.Sections.Count);
+            Assert.Equal(25, AuditRegistry.Sections.Count);
             var ids = new HashSet<string>();
             foreach (AuditSection s in AuditRegistry.Sections)
             {
@@ -62,6 +62,64 @@ namespace ExchangeAuditTool.Tests
             var ctx = new ScriptContext("C:\\Exports\\AddressPolicies.csv");
             string script = section.BuildScript(new AuditSelection(), ctx);
             Assert.Contains("Get-EmailAddressPolicy", script);
+        }
+
+        [Fact]
+        public void OrgConfigBatch_BuildsQueries()
+        {
+            var ctx = new ScriptContext("C:\\Exports\\Org.csv");
+            foreach (KeyValuePair<string, string> kv in new Dictionary<string, string>
+            {
+                { "journal-rules", "Get-JournalRule" },
+                { "certificates", "Get-ExchangeCertificate" }
+            })
+            {
+                AuditSection section = Find(kv.Key);
+                Assert.NotNull(section);
+                Assert.Equal("Organization", section.Category);
+                Assert.Equal(AuditScope.Both, section.Scope);
+                Assert.Contains(kv.Value, section.BuildScript(new AuditSelection(), ctx));
+            }
+
+            AuditSection retention = Find("retention-policies");
+            var sel = new AuditSelection();
+            sel.Set("object", new List<string>(new string[] { "policies" }));
+            Assert.Contains("Get-RetentionPolicy", retention.BuildScript(sel, ctx));
+            sel.Set("object", new List<string>(new string[] { "tags" }));
+            Assert.Contains("Get-RetentionPolicyTag", retention.BuildScript(sel, ctx));
+
+            AuditSection books = Find("address-books");
+            sel.Set("object", new List<string>(new string[] { "oab" }));
+            Assert.Contains("Get-OfflineAddressBook", books.BuildScript(sel, ctx));
+            sel.Set("object", new List<string>(new string[] { "lists" }));
+            Assert.Contains("Get-AddressList", books.BuildScript(sel, ctx));
+
+            AuditSection owa = Find("owa-policy");
+            Assert.Contains("Get-OwaMailboxPolicy", owa.BuildScript(new AuditSelection(), ctx));
+
+            AuditSection roles = Find("role-policies");
+            sel.Set("object", new List<string>(new string[] { "policies" }));
+            Assert.Contains("Get-RoleAssignmentPolicy", roles.BuildScript(sel, ctx));
+            sel.Set("object", new List<string>(new string[] { "assignments" }));
+            Assert.Contains("Get-ManagementRoleAssignment", roles.BuildScript(sel, ctx));
+        }
+
+        [Fact]
+        public void MailContacts_RoutingGroup_ExportsExternalEmail()
+        {
+            AuditRegistry.BuildAll();
+            AuditSection section = Find("mail-contacts");
+            bool hasRouting = false;
+            foreach (AuditOptionGroup g in section.Groups)
+            {
+                if (g.Key != "routing") continue;
+                hasRouting = true;
+                bool hasExternal = false;
+                foreach (AuditOption o in g.Options)
+                    if (o.Value == "ExternalEmailAddress") hasExternal = true;
+                Assert.True(hasExternal);
+            }
+            Assert.True(hasRouting);
         }
     }
 }

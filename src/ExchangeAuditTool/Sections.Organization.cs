@@ -14,13 +14,20 @@ namespace ExchangeAuditTool
         {
             AuditRegistry.Register(BuildOrgSharingSection());
             AuditRegistry.Register(BuildAddressPoliciesSection());
+            AuditRegistry.Register(BuildJournalRulesSection());
+            AuditRegistry.Register(BuildRetentionPoliciesSection());
+            AuditRegistry.Register(BuildAddressBooksSection());
+            AuditRegistry.Register(BuildCertificatesSection());
+            AuditRegistry.Register(BuildOwaPolicySection());
+            AuditRegistry.Register(BuildRolePoliciesSection());
         }
 
         // Properties that are collections -> joined with ',' so a ';' CSV never clashes.
         private static readonly List<string> MultiValued = new List<string>(new string[]
         {
             "Domains", "DomainNames",
-            "EnabledEmailAddressTemplates", "DisabledEmailAddressTemplates"
+            "EnabledEmailAddressTemplates", "DisabledEmailAddressTemplates",
+            "RetentionPolicyTagLinks", "AddressLists", "AssignedRoles"
         });
 
         private static string BuildSelectList(List<string> chosen)
@@ -183,6 +190,334 @@ namespace ExchangeAuditTool
                 sb.AppendLine("Write-Host 'Querying email address policies...'");
                 sb.AppendLine("$items = @(Get-EmailAddressPolicy -ErrorAction SilentlyContinue)");
                 sb.AppendLine("Write-Host (\"Retrieved {0} address policies.\" -f $items.Count)");
+                sb.AppendLine("$rows = $items | Select-Object " + selectList);
+                sb.AppendLine();
+                sb.Append(ctx.ExportCsv("$rows"));
+                sb.AppendLine("Write-Host 'Export complete.'");
+                return sb.ToString();
+            };
+
+            return section;
+        }
+
+        // ============================================================ 3. JOURNAL RULES
+        private static AuditSection BuildJournalRulesSection()
+        {
+            var section = new AuditSection(
+                "journal-rules",
+                "Journal rules",
+                "Journal rule export",
+                "Audit journal rules (Get-JournalRule): journaling must keep working after migration.",
+                "shield",
+                AuditScope.Both);
+            section.Category = "Organization";
+            section.DefaultFileName = "JournalRules.csv";
+
+            var props = new AuditOptionGroup("props", "Properties", GroupMode.MultiCheck); props.Columns = 2;
+            props.AddProp("Name", true);
+            props.AddProp("Enabled", true);
+            props.AddProp("JournalEmailAddress", true);
+            props.AddProp("Scope", true);
+            props.AddProp("Recipient", false);
+            section.AddGroup(props);
+
+            section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
+            {
+                var chosen = Collect(sel, "props");
+                if (chosen.Count == 0) chosen.Add("Name");
+                string selectList = BuildSelectList(chosen);
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Write-Host 'Querying journal rules...'");
+                sb.AppendLine("$items = @(Get-JournalRule -ErrorAction SilentlyContinue)");
+                sb.AppendLine("Write-Host (\"Retrieved {0} journal rule(s).\" -f $items.Count)");
+                sb.AppendLine("$rows = $items | Select-Object " + selectList);
+                sb.AppendLine();
+                sb.Append(ctx.ExportCsv("$rows"));
+                sb.AppendLine("Write-Host 'Export complete.'");
+                return sb.ToString();
+            };
+
+            return section;
+        }
+
+        // ============================================================ 4. RETENTION POLICIES
+        private static AuditSection BuildRetentionPoliciesSection()
+        {
+            var section = new AuditSection(
+                "retention-policies",
+                "Retention policies",
+                "Retention policy export",
+                "Audit retention policies and tags (Get-RetentionPolicy / Get-RetentionPolicyTag): MRM must be rebuilt in the target.",
+                "shield",
+                AuditScope.Both);
+            section.Category = "Organization";
+            section.DefaultFileName = "RetentionPolicies.csv";
+
+            var obj = new AuditOptionGroup("object", "Object", GroupMode.SingleChoice); obj.Columns = 1;
+            obj.Add(new AuditOption("policies", "Retention policies (Get-RetentionPolicy)", "policies", true));
+            obj.Add(new AuditOption("tags", "Retention tags (Get-RetentionPolicyTag)", "tags", false));
+            section.AddGroup(obj);
+
+            var policy = new AuditOptionGroup("policy", "Policy properties", GroupMode.MultiCheck); policy.Columns = 2;
+            policy.AddProp("Name", true);
+            policy.AddProp("RetentionPolicyTagLinks", true);
+            section.AddGroup(policy);
+
+            var tag = new AuditOptionGroup("tag", "Tag properties", GroupMode.MultiCheck); tag.Columns = 2;
+            tag.AddProp("Name", false);
+            tag.AddProp("Type", false);
+            tag.AddProp("RetentionEnabled", false);
+            tag.AddProp("AgeLimitForRetention", false);
+            tag.AddProp("RetentionAction", false);
+            section.AddGroup(tag);
+
+            section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
+            {
+                string which = sel.First("object", "policies");
+                string cmdlet;
+                string propGroup;
+                string label;
+                if (which == "tags") { cmdlet = "Get-RetentionPolicyTag"; propGroup = "tag"; label = "retention tags"; }
+                else { cmdlet = "Get-RetentionPolicy"; propGroup = "policy"; label = "retention policies"; }
+
+                var chosen = Collect(sel, propGroup);
+                if (chosen.Count == 0) chosen.Add("Name");
+                string selectList = BuildSelectList(chosen);
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Write-Host 'Querying " + label + "...'");
+                sb.AppendLine("$items = @(" + cmdlet + " -ErrorAction SilentlyContinue)");
+                sb.AppendLine("Write-Host (\"Retrieved {0} " + label + ".\" -f $items.Count)");
+                sb.AppendLine("$rows = $items | Select-Object " + selectList);
+                sb.AppendLine();
+                sb.Append(ctx.ExportCsv("$rows"));
+                sb.AppendLine("Write-Host 'Export complete.'");
+                return sb.ToString();
+            };
+
+            return section;
+        }
+
+        // ============================================================ 5. ADDRESS BOOKS
+        private static AuditSection BuildAddressBooksSection()
+        {
+            var section = new AuditSection(
+                "address-books",
+                "Address books",
+                "Address book export",
+                "Audit offline address books and address lists (Get-OfflineAddressBook / Get-AddressList): OAB must be regenerated after migration.",
+                "group",
+                AuditScope.Both);
+            section.Category = "Organization";
+            section.DefaultFileName = "AddressBooks.csv";
+
+            var obj = new AuditOptionGroup("object", "Object", GroupMode.SingleChoice); obj.Columns = 1;
+            obj.Add(new AuditOption("oab", "Offline address books (Get-OfflineAddressBook)", "oab", true));
+            obj.Add(new AuditOption("lists", "Address lists (Get-AddressList)", "lists", false));
+            section.AddGroup(obj);
+
+            var oab = new AuditOptionGroup("oab", "OAB properties", GroupMode.MultiCheck); oab.Columns = 2;
+            oab.AddProp("Name", true);
+            oab.AddProp("IsDefault", true);
+            oab.AddProp("AddressLists", true);
+            oab.AddProp("GeneratingMailbox", false);
+            section.AddGroup(oab);
+
+            var lists = new AuditOptionGroup("lists", "Address list properties", GroupMode.MultiCheck); lists.Columns = 2;
+            lists.AddProp("Name", false);
+            lists.AddProp("DisplayName", false);
+            lists.AddProp("RecipientFilter", false);
+            lists.AddProp("RecipientContainer", false);
+            lists.AddProp("IncludedRecipients", false);
+            lists.AddProp("LdapRecipientFilter", false);
+            section.AddGroup(lists);
+
+            section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
+            {
+                string which = sel.First("object", "oab");
+                string cmdlet;
+                string propGroup;
+                string label;
+                if (which == "lists") { cmdlet = "Get-AddressList"; propGroup = "lists"; label = "address lists"; }
+                else { cmdlet = "Get-OfflineAddressBook"; propGroup = "oab"; label = "offline address books"; }
+
+                var chosen = Collect(sel, propGroup);
+                if (chosen.Count == 0) chosen.Add("Name");
+                string selectList = BuildSelectList(chosen);
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Write-Host 'Querying " + label + "...'");
+                sb.AppendLine("$items = @(" + cmdlet + " -ErrorAction SilentlyContinue)");
+                sb.AppendLine("Write-Host (\"Retrieved {0} " + label + ".\" -f $items.Count)");
+                sb.AppendLine("$rows = $items | Select-Object " + selectList);
+                sb.AppendLine();
+                sb.Append(ctx.ExportCsv("$rows"));
+                sb.AppendLine("Write-Host 'Export complete.'");
+                return sb.ToString();
+            };
+
+            return section;
+        }
+
+        // ============================================================ 6. CERTIFICATES
+        private static AuditSection BuildCertificatesSection()
+        {
+            var section = new AuditSection(
+                "certificates",
+                "Certificates",
+                "Certificate export",
+                "Audit Exchange certificates (Get-ExchangeCertificate): expired federation/SMTP certs are the classic cutover-day surprise.",
+                "shield",
+                AuditScope.Both);
+            section.Category = "Organization";
+            section.DefaultFileName = "Certificates.csv";
+
+            var identity = new AuditOptionGroup("identity", "Identity & validity", GroupMode.MultiCheck); identity.Columns = 2;
+            identity.AddProp("Thumbprint", true);
+            identity.AddProp("Subject", true);
+            identity.AddProp("Issuer", true);
+            identity.AddProp("IsSelfSigned", true);
+            identity.AddProp("NotAfter", true);
+            section.AddGroup(identity);
+
+            var usage = new AuditOptionGroup("usage", "Services & domains", GroupMode.MultiCheck); usage.Columns = 2;
+            usage.AddProp("Services", true);
+            usage.AddProp("CertificateDomains", true);
+            section.AddGroup(usage);
+
+            section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
+            {
+                var chosen = Collect(sel, "identity", "usage");
+                if (chosen.Count == 0) chosen.Add("Thumbprint");
+                string selectList = BuildSelectList(chosen);
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Write-Host 'Querying Exchange certificates...'");
+                sb.AppendLine("$items = @(Get-ExchangeCertificate -ErrorAction SilentlyContinue)");
+                sb.AppendLine("Write-Host (\"Retrieved {0} certificate(s).\" -f $items.Count)");
+                sb.AppendLine("$rows = $items | Select-Object " + selectList);
+                sb.AppendLine();
+                sb.Append(ctx.ExportCsv("$rows"));
+                sb.AppendLine("Write-Host 'Export complete.'");
+                return sb.ToString();
+            };
+
+            return section;
+        }
+
+        // ============================================================ 7. OWA POLICY
+        private static AuditSection BuildOwaPolicySection()
+        {
+            var section = new AuditSection(
+                "owa-policy",
+                "OWA policy",
+                "OWA policy export",
+                "Audit Outlook on the web policies (Get-OwaMailboxPolicy): feature toggles users notice on day one.",
+                "rule",
+                AuditScope.Both);
+            section.Category = "Organization";
+            section.DefaultFileName = "OwaPolicy.csv";
+
+            var identity = new AuditOptionGroup("identity", "Identity", GroupMode.MultiCheck); identity.Columns = 2;
+            identity.AddProp("Name", true);
+            identity.AddProp("IsDefault", true);
+            section.AddGroup(identity);
+
+            var features = new AuditOptionGroup("features", "Feature toggles", GroupMode.MultiCheck); features.Columns = 2;
+            features.AddProp("DirectFileAccessOnPublicComputersEnabled", true);
+            features.AddProp("DirectFileAccessOnPrivateComputersEnabled", true);
+            features.AddProp("WebReadyDocumentViewingOnPublicComputersEnabled", false);
+            features.AddProp("WebReadyDocumentViewingOnPrivateComputersEnabled", false);
+            features.AddProp("OfflineAccessEnabled", false);
+            features.AddProp("InstantMessagingEnabled", false);
+            features.AddProp("CalendarEnabled", false);
+            features.AddProp("ContactsEnabled", false);
+            features.AddProp("TasksEnabled", false);
+            features.AddProp("NotesEnabled", false);
+            features.AddProp("JournalEnabled", false);
+            features.AddProp("RemindersAndNotificationsEnabled", false);
+            features.AddProp("SearchFoldersEnabled", false);
+            features.AddProp("SignaturesEnabled", false);
+            features.AddProp("ThemeSelectionEnabled", false);
+            features.AddProp("SetPhotoEnabled", false);
+            features.AddProp("TextMessagingEnabled", false);
+            features.AddProp("WssAccessOnPublicComputersEnabled", false);
+            features.AddProp("WssAccessOnPrivateComputersEnabled", false);
+            features.AddProp("ReportJunkEmailEnabled", false);
+            features.AddProp("UserVoiceEnabled", false);
+            section.AddGroup(features);
+
+            section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
+            {
+                var chosen = Collect(sel, "identity", "features");
+                if (chosen.Count == 0) chosen.Add("Name");
+                string selectList = BuildSelectList(chosen);
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Write-Host 'Querying OWA mailbox policies...'");
+                sb.AppendLine("$items = @(Get-OwaMailboxPolicy -ErrorAction SilentlyContinue)");
+                sb.AppendLine("Write-Host (\"Retrieved {0} OWA policies.\" -f $items.Count)");
+                sb.AppendLine("$rows = $items | Select-Object " + selectList);
+                sb.AppendLine();
+                sb.Append(ctx.ExportCsv("$rows"));
+                sb.AppendLine("Write-Host 'Export complete.'");
+                return sb.ToString();
+            };
+
+            return section;
+        }
+
+        // ============================================================ 8. ROLE POLICIES
+        private static AuditSection BuildRolePoliciesSection()
+        {
+            var section = new AuditSection(
+                "role-policies",
+                "Role policies",
+                "Role policy export",
+                "Audit RBAC end-user surface (Get-RoleAssignmentPolicy / Get-ManagementRoleAssignment).",
+                "shield",
+                AuditScope.Both);
+            section.Category = "Organization";
+            section.DefaultFileName = "RolePolicies.csv";
+
+            var obj = new AuditOptionGroup("object", "Object", GroupMode.SingleChoice); obj.Columns = 1;
+            obj.Add(new AuditOption("policies", "Assignment policies (Get-RoleAssignmentPolicy)", "policies", true));
+            obj.Add(new AuditOption("assignments", "Role assignments (Get-ManagementRoleAssignment)", "assignments", false));
+            section.AddGroup(obj);
+
+            var policy = new AuditOptionGroup("policy", "Policy properties", GroupMode.MultiCheck); policy.Columns = 2;
+            policy.AddProp("Name", true);
+            policy.AddProp("IsDefault", true);
+            policy.AddProp("Description", false);
+            policy.AddProp("AssignedRoles", true);
+            section.AddGroup(policy);
+
+            var assign = new AuditOptionGroup("assignments", "Assignment properties", GroupMode.MultiCheck); assign.Columns = 2;
+            assign.AddProp("Name", false);
+            assign.AddProp("Role", false);
+            assign.AddProp("RoleAssigneeName", false);
+            assign.AddProp("RoleAssigneeType", false);
+            assign.AddProp("Enabled", false);
+            section.AddGroup(assign);
+
+            section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
+            {
+                string which = sel.First("object", "policies");
+                string cmdlet;
+                string propGroup;
+                string label;
+                if (which == "assignments") { cmdlet = "Get-ManagementRoleAssignment"; propGroup = "assignments"; label = "role assignments"; }
+                else { cmdlet = "Get-RoleAssignmentPolicy"; propGroup = "policy"; label = "role assignment policies"; }
+
+                var chosen = Collect(sel, propGroup);
+                if (chosen.Count == 0) chosen.Add("Name");
+                string selectList = BuildSelectList(chosen);
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Write-Host 'Querying " + label + "...'");
+                sb.AppendLine("$items = @(" + cmdlet + " -ErrorAction SilentlyContinue)");
+                sb.AppendLine("Write-Host (\"Retrieved {0} " + label + ".\" -f $items.Count)");
                 sb.AppendLine("$rows = $items | Select-Object " + selectList);
                 sb.AppendLine();
                 sb.Append(ctx.ExportCsv("$rows"));

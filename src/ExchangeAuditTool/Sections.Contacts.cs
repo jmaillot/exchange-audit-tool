@@ -95,6 +95,11 @@ namespace ExchangeAuditTool
             identity.AddProp("PrimarySmtpAddress", true);
             section.AddGroup(identity);
 
+            var routing = new AuditOptionGroup("routing", "External routing (key)", GroupMode.MultiCheck); routing.Columns = 1;
+            routing.Hint = "ExternalEmailAddress is the coexistence routing target, distinct from PrimarySmtpAddress.";
+            routing.AddProp("ExternalEmailAddress", true);
+            section.AddGroup(routing);
+
             var type = new AuditOptionGroup("type", "Type", GroupMode.MultiCheck); type.Columns = 2;
             type.AddProp("RecipientType", false);
             section.AddGroup(type);
@@ -181,7 +186,7 @@ namespace ExchangeAuditTool
 
         private static string[] CommonMailContactGroups()
         {
-            return new string[] { "identity", "type", "nameparts", "org", "phone", "postal", "visibility", "mailflow", "moderation", "custom", "addressing" };
+            return new string[] { "identity", "routing", "type", "nameparts", "org", "phone", "postal", "visibility", "mailflow", "moderation", "custom", "addressing" };
         }
 
         private static string BuildRecipientScript(AuditSelection sel, ScriptContext ctx, string baseCmdlet, string label, string[] groupKeys)

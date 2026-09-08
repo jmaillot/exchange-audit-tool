@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ### Added
 
+- `journal-rules`, `retention-policies`, `address-books`, `certificates`, `owa-policy`, `role-policies` sections (Organization category, all on-prem + online)
+- `ExternalEmailAddress` on mail contacts (coexistence routing target)
 - `org-sharing` section (new Organization category): sharing policies, org relationships, federation trust/ID, org config essentials, one object per run
 - `address-policies` section: email address policy filters and templates
 
