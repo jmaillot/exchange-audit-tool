@@ -56,7 +56,7 @@ namespace ExchangeAuditTool
             return redacted;
         }
 
-        private static bool IsValidUpn(string upn)
+        internal static bool IsValidUpn(string upn)
         {
             if (string.IsNullOrEmpty(upn) || upn.IndexOf(' ') >= 0) return false;
             int at = upn.IndexOf('@');
@@ -64,7 +64,7 @@ namespace ExchangeAuditTool
             return upn.IndexOf('.', at) > at + 1 && upn.Length - upn.LastIndexOf('.') > 2;
         }
 
-        private static bool IsValidThumbprint(string thumb)
+        internal static bool IsValidThumbprint(string thumb)
         {
             if (string.IsNullOrEmpty(thumb) || thumb.Length != 40) return false;
             foreach (char c in thumb)
@@ -75,7 +75,7 @@ namespace ExchangeAuditTool
             return true;
         }
 
-        private static bool IsValidHostname(string host)
+        internal static bool IsValidHostname(string host)
         {
             if (string.IsNullOrEmpty(host) || host.Length < 3 || host.Length > 253) return false;
             if (host.IndexOf(' ') >= 0 || host.IndexOf('/') >= 0 || host.IndexOf('\\') >= 0) return false;
@@ -88,7 +88,7 @@ namespace ExchangeAuditTool
             return host.IndexOf('.') > 0;
         }
 
-        private static bool IsValidCsvPath(string csv)
+        internal static bool IsValidCsvPath(string csv)
         {
             if (string.IsNullOrEmpty(csv)) return false;
             if (csv.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return false;
@@ -460,7 +460,8 @@ namespace ExchangeAuditTool
             var optionsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(16, 14, 16, 14), AutoScroll = true };
 
             var headerRow = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = UiTheme.Surface };
-            var scopeBadge = new Label { Text = ScopeText(section.Scope), Dock = DockStyle.Left, Width = 240, ForeColor = UiTheme.Orange, Font = new Font("Segoe UI Semibold", 8F), TextAlign = ContentAlignment.MiddleLeft };
+            var scopeBadge = new Label { Text = ScopeText(section.Scope), Dock = DockStyle.Left, Width = 240, ForeColor = UiTheme.Orange, Font = new Font("Segoe UI Semibold", 8F), TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
+            _optionTip.SetToolTip(scopeBadge, scopeBadge.Text);
             var selectAllBtn = new ModernButton { Text = "Select all", Dock = DockStyle.Right, Width = 130, Height = 32, Padding = new Padding(0) };
             Action updateSelectAll = delegate
             {
@@ -563,6 +564,7 @@ namespace ExchangeAuditTool
             };
             tbFilter.TextChanged += delegate { applyFilter(); };
             _optionTip.SetToolTip(tbFilter, "Type to highlight matching options; groups without matches are hidden");
+            _optionTip.SetToolTip(selectAllBtn, "Toggles every option in this section (the filter only highlights, it does not limit the toggle)");
 
             optionsCard.Controls.Add(groupsHost);
             optionsCard.Controls.Add(filterRow);

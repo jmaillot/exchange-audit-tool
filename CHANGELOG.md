@@ -4,6 +4,15 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- xUnit coverage for connection/CSV validators (`IsValidUpn/Thumbprint/Hostname/CsvPath`)
+- Tooltip on Select-all clarifying the filter only highlights and never limits the toggle
+
+### Fixed
+
+- Scope badge truncates with ellipsis + tooltip instead of clipping
+
 ## [1.2.1] - 2026-09-08
 
 ### Added
