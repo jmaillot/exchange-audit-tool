@@ -14,7 +14,7 @@ namespace ExchangeAuditTool
         public static readonly Color Window = Color.FromArgb(7, 16, 28);
         public static readonly Color Sidebar = Color.FromArgb(9, 20, 34);
         public static readonly Color Surface = Color.FromArgb(12, 25, 41);
-        public static readonly Color Surface2 = Color.FromArgb(14, 29, 47);
+        public static readonly Color Surface2 = Color.FromArgb(19, 39, 63);
         public static readonly Color Border = Color.FromArgb(29, 48, 69);
         public static readonly Color Blue = Color.FromArgb(47, 111, 235);
         public static readonly Color BlueHover = Color.FromArgb(60, 125, 246);

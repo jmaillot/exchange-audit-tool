@@ -112,6 +112,7 @@ namespace ExchangeAuditTool
             public Label ResultInfo;
             public Label EmptyState;
             public string LastCsv;
+            public string Filter;
         }
 
         private readonly Dictionary<string, SectionUi> _sectionUi = new Dictionary<string, SectionUi>();
@@ -119,7 +120,7 @@ namespace ExchangeAuditTool
         private Control BuildConnectionPage()
         {
             var page = new Panel { BackColor = UiTheme.Window, Padding = new Padding(0, 0, 0, 10), AutoScroll = true };
-            var card = new RoundedPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(18, 14, 18, 14) };
+            var card = new RoundedPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, CornerRadius = 8, Padding = new Padding(18, 14, 18, 14) };
 
             var head = NewSectionHeader("connect", "Exchange connection", "Connect once - the session stays open until you close the app.");
 
@@ -170,7 +171,7 @@ namespace ExchangeAuditTool
             var rowOrg = NewLabeledRow("Tenant (organization)", tbOrg);
             var rowThumb = NewLabeledRow("Certificate thumbprint", tbThumb);
             var rowLocalInfo = new Panel { Dock = DockStyle.Top, Height = 44, BackColor = UiTheme.Surface };
-            var localInfo = new Label { Dock = DockStyle.Fill, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.3F), TextAlign = ContentAlignment.MiddleLeft,
+            var localInfo = new Label { Dock = DockStyle.Fill, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F), TextAlign = ContentAlignment.MiddleLeft,
                 Text = "Run the tool on the Exchange server. It loads RemoteExchange.ps1 (2013/2016/2019) or the E2010 snap-in automatically - no fields needed." };
             rowLocalInfo.Controls.Add(localInfo);
 
@@ -191,7 +192,7 @@ namespace ExchangeAuditTool
             rowRemoteAuth.Controls.Add(authLabel);
 
             var rowRemoteInfo = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = UiTheme.Surface };
-            var remoteInfo = new Label { Dock = DockStyle.Fill, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.3F), TextAlign = ContentAlignment.MiddleLeft,
+            var remoteInfo = new Label { Dock = DockStyle.Fill, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F), TextAlign = ContentAlignment.MiddleLeft,
                 Text = "Opens a remote session to http(s)://<server>/PowerShell/ and imports the cmdlets. Kerberos uses your identity; Basic prompts securely (use HTTPS)." };
             rowRemoteInfo.Controls.Add(remoteInfo);
 
@@ -466,12 +467,19 @@ namespace ExchangeAuditTool
             split.Panel1.Controls.Add(leftColumn);
             split.Panel2.Controls.Add(rightColumn);
 
-            var optionsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(16, 14, 16, 14), AutoScroll = true };
+            var optionsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 8, Padding = new Padding(16, 14, 16, 14), AutoScroll = true };
 
             var headerRow = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = UiTheme.Surface };
             var scopeBadge = new Label { Text = ScopeText(section.Scope), Dock = DockStyle.Left, Width = 240, ForeColor = UiTheme.Orange, Font = new Font("Segoe UI Semibold", 8F), TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true };
             _optionTip.SetToolTip(scopeBadge, scopeBadge.Text);
             var selectAllBtn = new ModernButton { Text = "Select all", Dock = DockStyle.Right, Width = 130, Height = 32, Padding = new Padding(0) };
+            Func<CheckBox, bool> inScope = delegate (CheckBox cb)
+            {
+                if (string.IsNullOrEmpty(ui.Filter)) return true;
+                var opt = cb.Tag as AuditOption;
+                string hay = ((opt != null ? opt.Label : cb.Text) ?? "").ToLowerInvariant();
+                return hay.Contains(ui.Filter);
+            };
             Action updateSelectAll = delegate
             {
                 int total = 0;
@@ -479,6 +487,7 @@ namespace ExchangeAuditTool
                 foreach (var kv in ui.Checks)
                     foreach (CheckBox cb in kv.Value)
                     {
+                        if (!inScope(cb)) continue;
                         total++;
                         if (cb.Checked) on++;
                     }
@@ -491,11 +500,11 @@ namespace ExchangeAuditTool
                 bool anyUnchecked = false;
                 foreach (var kv in ui.Checks)
                     foreach (CheckBox cb in kv.Value)
-                        if (!cb.Checked) { anyUnchecked = true; break; }
+                        if (inScope(cb) && !cb.Checked) { anyUnchecked = true; break; }
                 bool target = anyUnchecked;
                 foreach (var kv in ui.Checks)
                     foreach (CheckBox cb in kv.Value)
-                        cb.Checked = target;
+                        if (inScope(cb)) cb.Checked = target;
                 updateSelectAll();
             };
             headerRow.Controls.Add(selectAllBtn);
@@ -571,9 +580,14 @@ namespace ExchangeAuditTool
                     card.Visible = anyMatch;
                 }
             };
-            tbFilter.TextChanged += delegate { applyFilter(); };
+            tbFilter.TextChanged += delegate
+            {
+                ui.Filter = (tbFilter.Text ?? "").Trim().ToLowerInvariant();
+                applyFilter();
+                updateSelectAll();
+            };
             _optionTip.SetToolTip(tbFilter, "Type to highlight matching options; groups without matches are hidden");
-            _optionTip.SetToolTip(selectAllBtn, "Toggles every option in this section (the filter only highlights, it does not limit the toggle)");
+            _optionTip.SetToolTip(selectAllBtn, "Toggles options matching the current filter, or every option when no filter is typed");
 
             optionsCard.Controls.Add(groupsHost);
             optionsCard.Controls.Add(filterRow);
@@ -601,7 +615,7 @@ namespace ExchangeAuditTool
             buttonsRow.Controls.Add(ui.RunButton);
             buttonsRow.Controls.Add(ui.CancelButton);
 
-            var slowHint = new Label { Text = "Slow options selected - this run may take much longer.", Dock = DockStyle.Bottom, Height = 24, ForeColor = UiTheme.Orange, Font = new Font("Segoe UI", 8.3F), TextAlign = ContentAlignment.MiddleLeft, Visible = false };
+            var slowHint = new Label { Text = "Slow options selected - this run may take much longer.", Dock = DockStyle.Bottom, Height = 24, ForeColor = UiTheme.Orange, Font = new Font("Segoe UI", 8.5F), TextAlign = ContentAlignment.MiddleLeft, Visible = false };
 
             leftColumn.Controls.Add(optionsCard);
             leftColumn.Controls.Add(outputRow);
@@ -614,7 +628,7 @@ namespace ExchangeAuditTool
             slowHint.Visible = HasSlowOptions(ui);
             updateSelectAll();
 
-            var resultsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(12, 10, 12, 12) };
+            var resultsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 8, Padding = new Padding(12, 10, 12, 12) };
             var rHead = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = UiTheme.Surface };
             var rTitle = new Label { Text = "Results preview", Dock = DockStyle.Left, Width = 160, ForeColor = UiTheme.Text, Font = new Font("Segoe UI Semibold", 9.5F), TextAlign = ContentAlignment.MiddleLeft };
             ui.OpenButton = new ModernButton { Text = "Open CSV", Dock = DockStyle.Right, Width = 96, Height = 32, Padding = new Padding(0), Enabled = false };
@@ -634,7 +648,7 @@ namespace ExchangeAuditTool
             rHead.Controls.Add(folderBtn);
             rHead.Controls.Add(rTitle);
 
-            ui.ResultInfo = new Label { Text = "No results yet.", Dock = DockStyle.Top, Height = 22, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.3F), AutoEllipsis = true };
+            ui.ResultInfo = new Label { Text = "No results yet.", Dock = DockStyle.Top, Height = 22, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F), AutoEllipsis = true };
 
             ui.Grid = new DataGridView
             {
@@ -722,7 +736,7 @@ namespace ExchangeAuditTool
             var title = new Label { Text = grp.Title, Dock = DockStyle.Top, Height = 22, ForeColor = UiTheme.Text, Font = new Font("Segoe UI Semibold", 9.5F) };
             Label hint = null;
             if (!string.IsNullOrEmpty(grp.Hint))
-                hint = new Label { Text = grp.Hint, Dock = DockStyle.Top, Height = 18, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 7.8F) };
+                hint = new Label { Text = grp.Hint, Dock = DockStyle.Top, AutoSize = true, MaximumSize = new Size(400, 0), ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F) };
 
             int cols = Math.Max(1, grp.Columns);
             int rows = (grp.Options.Count + cols - 1) / cols;
@@ -1016,7 +1030,7 @@ namespace ExchangeAuditTool
             var panel = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = UiTheme.Surface };
             var icon = new PictureBox { Image = UiAssets.Render(iconKey, 22), Dock = DockStyle.Left, Width = 44, BackColor = UiTheme.Surface, SizeMode = PictureBoxSizeMode.CenterImage };
             var titleLabel = new Label { Text = title, Dock = DockStyle.Top, Height = 28, ForeColor = UiTheme.Text, Font = new Font("Segoe UI Semibold", 12F), TextAlign = ContentAlignment.BottomLeft };
-            var subLabel = new Label { Text = subtitle, Dock = DockStyle.Fill, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.2F), TextAlign = ContentAlignment.TopLeft };
+            var subLabel = new Label { Text = subtitle, Dock = DockStyle.Fill, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F), TextAlign = ContentAlignment.TopLeft };
             panel.Controls.Add(subLabel);
             panel.Controls.Add(titleLabel);
             panel.Controls.Add(icon);
