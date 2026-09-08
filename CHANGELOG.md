@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-09-08
+
+### Added
+
+- Safe Links and Safe Attachments policies + rules in `protection-policies`
+
 ## [1.10.0] - 2026-09-08
 
 ### Added
