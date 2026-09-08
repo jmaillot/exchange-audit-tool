@@ -12,6 +12,7 @@ All notable changes to this project are documented here. Format follows Keep a C
 ### Fixed
 
 - Scope badge truncates with ellipsis + tooltip instead of clipping
+- EXO module check failure shows "check failed - retry" in place instead of surfacing through the crash log
 
 ## [1.2.1] - 2026-09-08
 

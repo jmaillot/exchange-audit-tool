@@ -373,8 +373,10 @@ namespace ExchangeAuditTool
             if (_exoModuleStatus == null) return;
             _exoModuleStatus.Text = "checking...";
             _exoModuleStatus.ForeColor = UiTheme.Orange;
-            var r = await RunPowerShellCaptureAsync(ConnectionSettings.BuildModuleCheck());
-            string outp = (r.Output ?? "").Trim();
+            try
+            {
+                var r = await RunPowerShellCaptureAsync(ConnectionSettings.BuildModuleCheck());
+                string outp = (r.Output ?? "").Trim();
             if (outp.IndexOf("INSTALLED", StringComparison.OrdinalIgnoreCase) >= 0 && outp.IndexOf("NOTINSTALLED", StringComparison.OrdinalIgnoreCase) < 0)
             {
                 string ver = outp.Replace("INSTALLED", "").Trim();
@@ -385,6 +387,13 @@ namespace ExchangeAuditTool
             {
                 _exoModuleStatus.Text = "not installed - use \"Install EXO module\"";
                 _exoModuleStatus.ForeColor = UiTheme.Red;
+            }
+            }
+            catch (Exception ex)
+            {
+                _exoModuleStatus.Text = "check failed - retry";
+                _exoModuleStatus.ForeColor = UiTheme.Red;
+                AppendLog("[exo-module-check] " + ex.Message);
             }
         }
 
