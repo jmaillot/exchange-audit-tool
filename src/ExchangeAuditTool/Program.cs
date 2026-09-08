@@ -10,8 +10,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyProduct("Exchange Audit Tool")]
 [assembly: System.Reflection.AssemblyDescription("Modern GUI to run Exchange Online and on-premises audit exports.")]
 [assembly: System.Reflection.AssemblyCompany("Prodware")]
-[assembly: System.Reflection.AssemblyVersion("1.8.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.8.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.9.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.9.0.0")]
 
 namespace ExchangeAuditTool
 {

@@ -401,6 +401,7 @@ namespace ExchangeAuditTool
             opOut.AddProp("DNSRoutingEnabled", false);
             opOut.AddProp("SourceTransportServers", true);
             opOut.AddProp("TlsAuthLevel", false);
+            opOut.AddProp("TlsCertificateName", false);
             opOut.AddProp("MaxMessageSize", false);
             section.AddGroup(opOut);
 

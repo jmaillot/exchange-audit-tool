@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- `mobile-devices` section: per-mailbox partnerships (type, model, OS, access state, sync times) for wipe/re-enroll planning
+- Item counts + archive size/items on user, shared, room and equipment mailboxes (item count also on PF mailboxes)
+- Send-connector `TlsCertificateName`
+
 ## [1.8.0] - 2026-09-08
 
 ### Added

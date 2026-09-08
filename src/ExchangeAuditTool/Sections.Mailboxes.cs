@@ -9,6 +9,7 @@ namespace ExchangeAuditTool
         public static void RegisterMailboxSections()
         {
             AuditRegistry.Register(BuildMailboxListSection());
+            AuditRegistry.Register(BuildMobileDevicesSection());
         }
 
         private static readonly List<string> MultiValued = new List<string>(new string[]
@@ -206,12 +207,14 @@ namespace ExchangeAuditTool
             section.AddGroup(status);
 
             var extra = new AuditOptionGroup("complementary", "Complementary data (bulk-indexed)", GroupMode.MultiCheck);
-            extra.Hint = "Permissions are pre-fetched in one bulk pass. Regional config is per-mailbox.";
+            extra.Hint = "Permissions are pre-fetched in one bulk pass. Regional config, counts and archive lookups are per-mailbox.";
             extra.Columns = 1;
             extra.Add(new AuditOption("fullaccess", "FullAccess delegates - bulk Get-(EXO)MailboxPermission", "fullaccess", false));
             extra.Add(new AuditOption("sendas", "SendAs delegates - EXO: RecipientPermission / on-prem: ADPermission", "sendas", false));
             extra.Add(new AuditOption("grantsendonbehalf", "Send on Behalf (GrantSendOnBehalfTo, resolved to SMTP)", "grantsendonbehalf", false));
             extra.Add(new AuditOption("mailboxsize", "Mailbox size in MB (Get-MailboxStatistics)", "mailboxsize", false).MarkSlow());
+            extra.Add(new AuditOption("mailboxitemcount", "Item count (Get-MailboxStatistics)", "mailboxitemcount", false).MarkSlow());
+            extra.Add(new AuditOption("archivesize", "Archive size MB + items (per-mailbox, slower)", "archivesize", false).MarkSlow());
             extra.Add(new AuditOption("regional", "Regional config (Language, TimeZone) - per-mailbox, slower", "regional", false).MarkSlow());
             section.AddGroup(extra);
 
@@ -289,6 +292,8 @@ namespace ExchangeAuditTool
                 bool fa = sel.IsSelected("complementary", "fullaccess");
                 bool sa = sel.IsSelected("complementary", "sendas");
                 bool needSize = sel.IsSelected("complementary", "mailboxsize");
+                bool needCount = sel.IsSelected("complementary", "mailboxitemcount");
+                bool needArchive = sel.IsSelected("complementary", "archivesize");
 
                 string getMbx = online ? "Get-EXOMailbox" : "Get-Mailbox";
                 string getMbxPerm = online ? "Get-EXOMailboxPermission" : "Get-MailboxPermission";
@@ -302,6 +307,8 @@ namespace ExchangeAuditTool
                 if (needResolver) PsScriptHelpers.EmitResolver(sb, getRecip, false);
 
                 if (needSize) PsScriptHelpers.EmitSizeHelper(sb, getStats);
+                if (needCount) PsScriptHelpers.EmitCountHelper(sb, getStats);
+                if (needArchive) PsScriptHelpers.EmitArchiveHelpers(sb, getStats);
 
                 sb.AppendLine("Write-Host 'Querying USER mailboxes...'");
                 sb.AppendLine("$mbx = @(" + getMbx + " -ResultSize " + resultSize + " -RecipientTypeDetails UserMailbox" + propsArg + ")");
@@ -350,7 +357,7 @@ namespace ExchangeAuditTool
                     sb.AppendLine();
                 }
 
-                if (!fa && !sa && !regional && !needUser && !needSize)
+                if (!fa && !sa && !regional && !needUser && !needSize && !needCount && !needArchive)
                 {
                     sb.AppendLine("$rows = $mbx | Select-Object " + selectList);
                 }
@@ -394,10 +401,80 @@ namespace ExchangeAuditTool
                     }
                     if (needSize)
                         sb.AppendLine("    $obj | Add-Member -NotePropertyName MailboxSizeMB -NotePropertyValue (Get-SizeMB $m.PrimarySmtpAddress) -Force");
+                    if (needCount)
+                        sb.AppendLine("    $obj | Add-Member -NotePropertyName MailboxItemCount -NotePropertyValue (Get-ItemCount $m.PrimarySmtpAddress) -Force");
+                    if (needArchive)
+                    {
+                        sb.AppendLine("    $obj | Add-Member -NotePropertyName ArchiveSizeMB -NotePropertyValue (Get-ArchiveMB $m.PrimarySmtpAddress) -Force");
+                        sb.AppendLine("    $obj | Add-Member -NotePropertyName ArchiveItemCount -NotePropertyValue (Get-ArchiveCount $m.PrimarySmtpAddress) -Force");
+                    }
                     sb.AppendLine("    $obj");
                     sb.AppendLine("}");
                 }
 
+                sb.AppendLine();
+                sb.Append(ctx.ExportCsv("$rows"));
+                sb.AppendLine("Write-Host 'Export complete.'");
+                return sb.ToString();
+            };
+
+            return section;
+        }
+
+        // ============================================================ MOBILE DEVICES
+        private static AuditSection BuildMobileDevicesSection()
+        {
+            var section = new AuditSection(
+                "mobile-devices",
+                "Mobile devices",
+                "Mobile device export",
+                "Audit mobile partnerships (Get-MobileDevice): wipe / re-enroll planning. One call per mailbox.",
+                "mobile",
+                AuditScope.Both);
+            section.Category = "Mailboxes";
+            section.DefaultFileName = "MobileDevices.csv";
+
+            var devices = new AuditOptionGroup("devices", "Device properties", GroupMode.MultiCheck); devices.Columns = 2;
+            devices.MarkSlow();
+            devices.AddProp("DeviceId", true);
+            devices.AddProp("DeviceType", true);
+            devices.AddProp("DeviceModel", true);
+            devices.AddProp("DeviceOS", true);
+            devices.AddProp("DeviceAccessState", true);
+            devices.AddProp("FirstSyncTime", false);
+            devices.AddProp("LastSyncAttemptTime", false);
+            devices.AddProp("LastSuccessSync", false);
+            section.AddGroup(devices);
+
+            PsScriptHelpers.AddSizeGroup(section);
+
+            section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
+            {
+                string resultSize = sel.First("size", "Unlimited");
+                var chosen = new List<string>();
+                foreach (string v in sel.Selected("devices"))
+                    if (!chosen.Contains(v)) chosen.Add(v);
+                if (chosen.Count == 0) chosen.Add("DeviceId");
+
+                bool online = ConnectionSettings.IsOnline;
+                string getMbx = online ? "Get-EXOMailbox" : "Get-Mailbox";
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Write-Host 'Querying USER mailboxes...'");
+                sb.AppendLine("$mbx = @(" + getMbx + " -ResultSize " + resultSize + " -RecipientTypeDetails UserMailbox)");
+                sb.AppendLine("Write-Host (\"Retrieved {0} user mailbox(es).\" -f $mbx.Count)");
+                sb.AppendLine("Write-Host 'Querying mobile devices (one call per mailbox)...'");
+                sb.AppendLine("$rows = foreach ($m in $mbx) {");
+                sb.AppendLine("    $devs = @(Get-MobileDevice -Mailbox $m.Identity -ErrorAction SilentlyContinue)");
+                sb.AppendLine("    foreach ($d in $devs) {");
+                sb.AppendLine("        $obj = New-Object psobject");
+                sb.AppendLine("        $obj | Add-Member -NotePropertyName MailboxDisplayName -NotePropertyValue ([string]$m.DisplayName) -Force");
+                sb.AppendLine("        $obj | Add-Member -NotePropertyName PrimarySmtpAddress -NotePropertyValue ([string]$m.PrimarySmtpAddress) -Force");
+                foreach (string prop in chosen)
+                    sb.AppendLine("        $obj | Add-Member -NotePropertyName " + prop + " -NotePropertyValue ([string]$d." + prop + ") -Force");
+                sb.AppendLine("        $obj");
+                sb.AppendLine("    }");
+                sb.AppendLine("}");
                 sb.AppendLine();
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");

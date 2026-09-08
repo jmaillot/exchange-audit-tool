@@ -17,7 +17,7 @@ namespace ExchangeAuditTool.Tests
         public void Registry_ContainsNewSections()
         {
             AuditRegistry.BuildAll();
-            Assert.Equal(25, AuditRegistry.Sections.Count);
+            Assert.Equal(26, AuditRegistry.Sections.Count);
             var ids = new HashSet<string>();
             foreach (AuditSection s in AuditRegistry.Sections)
             {
