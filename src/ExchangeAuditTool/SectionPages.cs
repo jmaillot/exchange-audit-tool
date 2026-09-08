@@ -116,6 +116,9 @@ namespace ExchangeAuditTool
             public PowerShellSession Ps;
             public CancellationTokenSource RunCts;
             public PowerShellSession ActiveSession;
+            public CheckBox XlsxBox;
+            public ModernButton OpenXlsxButton;
+            public string LastXlsx;
         }
 
         private readonly Dictionary<string, SectionUi> _sectionUi = new Dictionary<string, SectionUi>();
@@ -624,6 +627,9 @@ namespace ExchangeAuditTool
                 using (var dlg = new SaveFileDialog { Filter = "CSV file (*.csv)|*.csv", DefaultExt = "csv", AddExtension = true, FileName = section.DefaultFileName })
                     if (dlg.ShowDialog(this) == DialogResult.OK) ui.OutputPath.Text = dlg.FileName;
             };
+            ui.XlsxBox = new CheckBox { Text = "XLSX", Checked = true, Dock = DockStyle.Right, Width = 62, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
+            _optionTip.SetToolTip(ui.XlsxBox, "Also save an .xlsx workbook (bold header, filter, frozen top row) next to the CSV");
+            outputRow.Controls.Add(ui.XlsxBox);
             outputRow.Controls.Add(browse);
             outputRow.Dock = DockStyle.Bottom;
 
@@ -661,6 +667,9 @@ namespace ExchangeAuditTool
             var rTitle = new Label { Text = "Results preview", Dock = DockStyle.Left, Width = 160, ForeColor = UiTheme.Text, Font = new Font("Segoe UI Semibold", 9.5F), TextAlign = ContentAlignment.MiddleLeft };
             ui.OpenButton = new ModernButton { Text = "Open CSV", Dock = DockStyle.Right, Width = 96, Height = 32, Padding = new Padding(0), Enabled = false };
             ui.OpenButton.Click += delegate { if (!string.IsNullOrEmpty(ui.LastCsv) && File.Exists(ui.LastCsv)) OpenPath(ui.LastCsv); };
+            ui.OpenXlsxButton = new ModernButton { Text = "XLSX", Dock = DockStyle.Right, Width = 64, Height = 32, Padding = new Padding(0), Enabled = false };
+            ui.OpenXlsxButton.Click += delegate { if (!string.IsNullOrEmpty(ui.LastXlsx) && File.Exists(ui.LastXlsx)) OpenPath(ui.LastXlsx); };
+            _optionTip.SetToolTip(ui.OpenXlsxButton, "Open the .xlsx workbook");
             var folderBtn = new ModernButton { Text = "Folder", Dock = DockStyle.Right, Width = 70, Height = 32, Padding = new Padding(0) };
             folderBtn.Click += delegate
             {
@@ -672,6 +681,7 @@ namespace ExchangeAuditTool
                 }
                 catch { }
             };
+            rHead.Controls.Add(ui.OpenXlsxButton);
             rHead.Controls.Add(ui.OpenButton);
             rHead.Controls.Add(folderBtn);
             rHead.Controls.Add(rTitle);
@@ -954,6 +964,22 @@ namespace ExchangeAuditTool
                             SetResult(ui, "✓ Exported to " + Path.GetFileName(csv) + " (" + size + ") in " + took + "  -  " + previewed + " row(s) previewed. Full path: " + csv, UiTheme.Green);
                         ui.EmptyState.Visible = total == 0;
                         ui.ResultInfo.ForeColor = UiTheme.Green;
+                        if (ui.XlsxBox != null && ui.XlsxBox.Checked)
+                        {
+                            string xlsx = Path.ChangeExtension(csv, ".xlsx");
+                            XlsxWriteResult xr = XlsxWriter.WriteFromCsv(csv, xlsx, section.NavTitle);
+                            if (xr.Ok)
+                            {
+                                ui.LastXlsx = xlsx;
+                                ui.OpenXlsxButton.Enabled = true;
+                                SetResult(ui, ui.ResultInfo.Text + " + XLSX (" + xr.DataRows + " rows" + (xr.Truncated ? ", truncated to Excel limits" : "") + ").", UiTheme.Green);
+                            }
+                            else
+                            {
+                                AppendLog("[xlsx] workbook not written: " + xr.Error);
+                                SetResult(ui, ui.ResultInfo.Text + " (XLSX failed: " + xr.Error + ").", UiTheme.Green);
+                            }
+                        }
                         SetFooter(section.NavTitle + " done in " + took, UiTheme.Green);
                         if (!_isConnected) await RefreshConnectedAsAsync();
                     }
