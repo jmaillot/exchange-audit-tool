@@ -77,6 +77,8 @@ else {
         "/reference:System.Core.dll",
         "/reference:System.Drawing.dll",
         "/reference:System.Windows.Forms.dll",
+        "/reference:System.Xml.dll",
+        "/reference:WindowsBase.dll",
         "/out:$exe"
     ) + $sources
     & $csc @cscArgs
