@@ -93,9 +93,21 @@ namespace ExchangeAuditTool
             Height = 36;
         }
 
-        protected override bool ShowFocusCues { get { return false; } }
-        protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); BackColor = HoverColor; }
-        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); BackColor = Active ? UiTheme.Blue : NormalColor; }
+        protected override void OnMouseEnter(EventArgs e)
+        {
+            base.OnMouseEnter(e);
+            if (Enabled) BackColor = HoverColor;
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            if (Enabled) BackColor = Active ? UiTheme.Blue : NormalColor;
+        }
+
+        protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
+        protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+        protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
 
         protected override void OnPaint(PaintEventArgs pevent)
         {
@@ -103,15 +115,35 @@ namespace ExchangeAuditTool
             pevent.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             Rectangle rect = new Rectangle(0, 0, Width - 1, Height - 1);
             int radius = Math.Min(CornerRadius, Math.Max(1, Math.Min(Width, Height) / 2 - 1));
+            Color bg = BackColor;
+            Color fg = ForeColor;
+            Color border = Active ? Color.FromArgb(92, 151, 255) : BorderColor;
+            if (!Enabled)
+            {
+                bg = Color.FromArgb(28, 42, 60);
+                fg = UiTheme.Muted;
+                border = Color.FromArgb(35, 55, 78);
+            }
             using (GraphicsPath path = RoundedPanel.BuildRoundRect(rect, radius))
-            using (SolidBrush brush = new SolidBrush(BackColor))
-            using (Pen pen = new Pen(Active ? Color.FromArgb(92, 151, 255) : BorderColor))
+            using (SolidBrush brush = new SolidBrush(bg))
+            using (Pen pen = new Pen(border))
             {
                 Region = new Region(path);
                 pevent.Graphics.FillPath(brush, path);
                 pevent.Graphics.DrawPath(pen, path);
-                TextRenderer.DrawText(pevent.Graphics, Text, Font, rect, ForeColor,
+                TextRenderer.DrawText(pevent.Graphics, Text, Font, rect, fg,
                     TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.EndEllipsis);
+                if (Enabled && (Focused || ContainsFocus))
+                {
+                    Rectangle focusRect = new Rectangle(3, 3, Width - 7, Height - 7);
+                    int focusRadius = Math.Max(1, radius - 2);
+                    using (GraphicsPath focusPath = RoundedPanel.BuildRoundRect(focusRect, focusRadius))
+                    using (Pen focusPen = new Pen(Color.FromArgb(147, 183, 255)))
+                    {
+                        focusPen.DashStyle = DashStyle.Dash;
+                        pevent.Graphics.DrawPath(focusPen, focusPath);
+                    }
+                }
             }
         }
     }

@@ -75,19 +75,19 @@ namespace ExchangeAuditTool
         private Control BuildConnectionPage()
         {
             var page = new Panel { BackColor = UiTheme.Window, Padding = new Padding(0, 0, 0, 10), AutoScroll = true };
-            var card = new RoundedPanel { Dock = DockStyle.Top, Height = 570, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(18, 14, 18, 14) };
+            var card = new RoundedPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(18, 14, 18, 14) };
 
             var head = NewSectionHeader("connect", "Exchange connection", "Connect once - the session stays open until you close the app.");
 
-            var modeGroup = new Panel { Dock = DockStyle.Top, Height = 66, BackColor = UiTheme.Surface };
+            var modeGroup = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(0, 4, 0, 4) };
             var rInteractive = NewRadio("Exchange Online (interactive)", true);
             var rApp = NewRadio("Exchange Online (app-only cert)", false);
             var rLocal = NewRadio("On-premises (run on Exchange server)", false);
             var rRemote = NewRadio("On-premises (remote PowerShell)", false);
-            rInteractive.Location = new Point(0, 6); rInteractive.Width = 250;
-            rApp.Location = new Point(260, 6); rApp.Width = 260;
-            rLocal.Location = new Point(0, 36); rLocal.Width = 300;
-            rRemote.Location = new Point(300, 36); rRemote.Width = 300;
+            rInteractive.Margin = new Padding(0, 4, 16, 4);
+            rApp.Margin = new Padding(0, 4, 16, 4);
+            rLocal.Margin = new Padding(0, 4, 16, 4);
+            rRemote.Margin = new Padding(0, 4, 0, 4);
             modeGroup.Controls.Add(rInteractive); modeGroup.Controls.Add(rApp);
             modeGroup.Controls.Add(rLocal); modeGroup.Controls.Add(rRemote);
 
@@ -154,7 +154,7 @@ namespace ExchangeAuditTool
             // Keep Basic and HTTPS in sync (Basic should be used over HTTPS).
             rBasic.CheckedChanged += delegate { if (rBasic.Checked) cbHttps.Checked = true; };
 
-            var fields = new Panel { Dock = DockStyle.Top, Height = 220, BackColor = UiTheme.Surface, Padding = new Padding(0, 8, 0, 0) };
+            var fields = new Panel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, Padding = new Padding(0, 8, 0, 0) };
             fields.Controls.Add(rowLocalInfo);
             fields.Controls.Add(rowRemoteInfo);
             fields.Controls.Add(rowRemoteAuth);
@@ -186,12 +186,12 @@ namespace ExchangeAuditTool
             rLocal.CheckedChanged += delegate { applyMode(); };
             rRemote.CheckedChanged += delegate { applyMode(); };
 
-            var buttons = new Panel { Dock = DockStyle.Bottom, Height = 48, BackColor = UiTheme.Surface };
-            var save = new ModernButton { Text = "Connect", Width = 160, Height = 36, Location = new Point(0, 8) };
+            var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(0, 8, 0, 0) };
+            var save = new ModernButton { Text = "Connect", Width = 160, Height = 36, Margin = new Padding(0, 0, 8, 8) };
             save.NormalColor = UiTheme.Blue; save.BackColor = UiTheme.Blue; save.ForeColor = Color.White;
-            var installMod = new ModernButton { Text = "Install EXO module", Width = 170, Height = 36, Location = new Point(170, 8) };
-            var disconnectBtn = new ModernButton { Text = "Disconnect", Width = 120, Height = 36, Location = new Point(348, 8) };
-            _connStatus = new Label { Text = ConnectionSettings.Summary(), Location = new Point(478, 16), AutoSize = true, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F) };
+            var installMod = new ModernButton { Text = "Install EXO module", Width = 170, Height = 36, Margin = new Padding(0, 0, 8, 8) };
+            var disconnectBtn = new ModernButton { Text = "Disconnect", Width = 120, Height = 36, Margin = new Padding(0, 0, 8, 8) };
+            _connStatus = new Label { Text = ConnectionSettings.Summary(), AutoSize = true, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F), Margin = new Padding(8, 10, 0, 8) };
             buttons.Controls.Add(save); buttons.Controls.Add(installMod); buttons.Controls.Add(disconnectBtn); buttons.Controls.Add(_connStatus);
 
             save.Click += async delegate
