@@ -66,7 +66,8 @@ docs/                        → Additional documentation
 | `src/ExchangeAuditTool/Sections.Contacts.cs` | Mail users / Mail contacts |
 | `src/ExchangeAuditTool/Sections.DomainsRouting.cs` | Transport rules / Accepted / Remote domains / Connectors |
 | `src/ExchangeAuditTool/Sections.PublicFolders.cs` | PF mailboxes / hierarchy / mail-enabled PF |
-| `src/ExchangeAuditTool/Sections.Organization.cs` | Sharing & org / address policies |
+| `src/ExchangeAuditTool/Sections.Organization.cs` | Sharing & org / address policies / journal / retention / books / certs / OWA / roles |
+| `src/ExchangeAuditTool/Sections.Protection.cs` | EOP + DLP policies and rules (online-only) |
 | `src/ExchangeAuditTool/Theme.cs`, `BrandAssets.cs` | Dark theme, `RoundedPanel` / `ModernButton`, vector icons, logo |
 | `src/ExchangeAuditTool/app.manifest`, `app.ico` | `asInvoker`, PerMonitorV2 DPI, Win10/11 support; app icon |
 | `Build-ExchangeAuditTool.ps1` | Build script (`dotnet publish`, `csc` fallback) |

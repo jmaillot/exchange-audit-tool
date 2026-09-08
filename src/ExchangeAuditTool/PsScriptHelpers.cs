@@ -48,6 +48,35 @@ namespace ExchangeAuditTool
             sb.AppendLine();
         }
 
+        public static void EmitCountHelper(StringBuilder sb, string getStatsCmd)
+        {
+            sb.AppendLine("function Get-ItemCount {");
+            sb.AppendLine("    param($identity)");
+            sb.AppendLine("    try {");
+            sb.AppendLine("        $st = " + getStatsCmd + " -Identity $identity -ErrorAction Stop");
+            sb.AppendLine("        if ($st -and $null -ne $st.ItemCount) { return $st.ItemCount }");
+            sb.AppendLine("    } catch { }");
+            sb.AppendLine("    return ''");
+            sb.AppendLine("}");
+            sb.AppendLine();
+        }
+
+        public static void EmitArchiveMBHelper(StringBuilder sb, string getStatsCmd)
+        {
+            sb.AppendLine("function Get-ArchiveMB {");
+            sb.AppendLine("    param($identity)");
+            sb.AppendLine("    try {");
+            sb.AppendLine("        $st = " + getStatsCmd + " -Identity $identity -Archive -ErrorAction Stop");
+            sb.AppendLine("        if ($st -and $st.TotalItemSize) {");
+            sb.AppendLine("            $s = $st.TotalItemSize.ToString()");
+            sb.AppendLine("            if ($s -match '\\(([\\d,]+) bytes\\)') { return [math]::Round(([double]($matches[1] -replace ',','')) / 1MB, 2) }");
+            sb.AppendLine("        }");
+            sb.AppendLine("    } catch { }");
+            sb.AppendLine("    return ''");
+            sb.AppendLine("}");
+            sb.AppendLine();
+        }
+
         public static void AddSizeGroup(AuditSection section)
         {
             var size = new AuditOptionGroup("size", "Result size", GroupMode.SingleChoice); size.Columns = 3;

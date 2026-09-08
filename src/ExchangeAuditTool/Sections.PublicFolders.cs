@@ -85,6 +85,7 @@ namespace ExchangeAuditTool
 
             var extra = new AuditOptionGroup("complementary", "Complementary data", GroupMode.MultiCheck); extra.Columns = 1;
             extra.Add(new AuditOption("mailboxsize", "Mailbox size in MB (Get-MailboxStatistics)", "mailboxsize", false).MarkSlow());
+            extra.Add(new AuditOption("mailboxitemcount", "Item count (Get-MailboxStatistics)", "mailboxitemcount", false).MarkSlow());
             section.AddGroup(extra);
 
             PsScriptHelpers.AddSizeGroup(section);
@@ -111,18 +112,20 @@ namespace ExchangeAuditTool
                 string selectList = string.Join(", ", exprs.ToArray());
 
                 bool needSize = sel.IsSelected("complementary", "mailboxsize");
+                bool needCount = sel.IsSelected("complementary", "mailboxitemcount");
                 bool online = ConnectionSettings.IsOnline;
                 string getStats = online ? "Get-EXOMailboxStatistics" : "Get-MailboxStatistics";
 
                 var sb = new StringBuilder();
                 if (needSize) PsScriptHelpers.EmitSizeHelper(sb, getStats);
+                if (needCount) PsScriptHelpers.EmitCountHelper(sb, getStats);
 
                 sb.AppendLine("Write-Host 'Querying public folder mailboxes...'");
                 sb.AppendLine("$mbx = @(Get-Mailbox -PublicFolder -ResultSize " + resultSize + ")");
                 sb.AppendLine("Write-Host (\"Retrieved {0} public folder mailbox(es).\" -f $mbx.Count)");
                 sb.AppendLine();
 
-                if (!needSize)
+                if (!needSize && !needCount)
                 {
                     sb.AppendLine("$rows = $mbx | Select-Object " + selectList);
                 }
@@ -130,7 +133,10 @@ namespace ExchangeAuditTool
                 {
                     sb.AppendLine("$rows = foreach ($m in $mbx) {");
                     sb.AppendLine("    $obj = $m | Select-Object " + selectList);
-                    sb.AppendLine("    $obj | Add-Member -NotePropertyName MailboxSizeMB -NotePropertyValue (Get-SizeMB $m.PrimarySmtpAddress) -Force");
+                    if (needSize)
+                        sb.AppendLine("    $obj | Add-Member -NotePropertyName MailboxSizeMB -NotePropertyValue (Get-SizeMB $m.PrimarySmtpAddress) -Force");
+                    if (needCount)
+                        sb.AppendLine("    $obj | Add-Member -NotePropertyName MailboxItemCount -NotePropertyValue (Get-ItemCount $m.PrimarySmtpAddress) -Force");
                     sb.AppendLine("    $obj");
                     sb.AppendLine("}");
                 }

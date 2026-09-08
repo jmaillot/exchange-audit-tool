@@ -107,11 +107,16 @@ namespace ExchangeAuditTool
             folder.Columns = 2;
             folder.Add(new AuditOption("calendar", "Calendar", "Calendar", false));
             folder.Add(new AuditOption("inbox", "Inbox", "Inbox", false));
+            folder.Add(new AuditOption("sentitems", "Sent Items", "SentItems", false));
+            folder.Add(new AuditOption("contacts", "Contacts", "Contacts", false));
+            folder.Add(new AuditOption("tasks", "Tasks", "Tasks", false));
             section.AddGroup(folder);
 
             var extra = new AuditOptionGroup("complementary", "Complementary data", GroupMode.MultiCheck);
             extra.Columns = 1;
             extra.Add(new AuditOption("mailboxsize", "Mailbox size in MB (Get-MailboxStatistics)", "mailboxsize", false).MarkSlow());
+            extra.Add(new AuditOption("mailboxitemcount", "Item count (Get-MailboxStatistics)", "mailboxitemcount", false).MarkSlow());
+            extra.Add(new AuditOption("archivesize", "Archive size in MB (per-mailbox, slower)", "archivesize", false).MarkSlow());
             extra.Add(new AuditOption("accountstatus", "Account activated / disabled (Get-User)", "accountstatus", false));
             extra.Add(new AuditOption("regional", "Regional config (Language, TimeZone) - per-mailbox, slower", "regional", false).MarkSlow());
             section.AddGroup(extra);
@@ -148,6 +153,8 @@ namespace ExchangeAuditTool
                 if (sob) needResolver = true;
                 List<string> folders = sel.Selected("folderperms");
                 bool needSize = sel.IsSelected("complementary", "mailboxsize");
+                bool needCount = sel.IsSelected("complementary", "mailboxitemcount");
+                bool needArchive = sel.IsSelected("complementary", "archivesize");
                 bool acctStatus = sel.IsSelected("complementary", "accountstatus");
                 bool regional = sel.IsSelected("complementary", "regional");
 
@@ -158,10 +165,12 @@ namespace ExchangeAuditTool
                 string getMbxPerm = "Get-MailboxPermission";
                 string getRecPerm = online ? "Get-EXORecipientPermission" : "Get-RecipientPermission";
 
-                bool perRow = fa || sa || sob || automap || folders.Count > 0 || needSize || acctStatus || regional;
+                bool perRow = fa || sa || sob || automap || folders.Count > 0 || needSize || needCount || needArchive || acctStatus || regional;
 
                 var sb = new StringBuilder();
                 if (needSize) PsScriptHelpers.EmitSizeHelper(sb, getStats);
+                if (needCount) PsScriptHelpers.EmitCountHelper(sb, getStats);
+                if (needArchive) PsScriptHelpers.EmitArchiveMBHelper(sb, getStats);
                 if (needResolver || automap) PsScriptHelpers.EmitResolver(sb, getRecip, false);
 
                 sb.AppendLine("Write-Host 'Querying shared mailboxes...'");
@@ -258,6 +267,10 @@ namespace ExchangeAuditTool
                     }
                     if (needSize)
                         sb.AppendLine("    $obj | Add-Member -NotePropertyName MailboxSizeMB -NotePropertyValue (Get-SizeMB $m.PrimarySmtpAddress) -Force");
+                    if (needCount)
+                        sb.AppendLine("    $obj | Add-Member -NotePropertyName MailboxItemCount -NotePropertyValue (Get-ItemCount $m.PrimarySmtpAddress) -Force");
+                    if (needArchive)
+                        sb.AppendLine("    $obj | Add-Member -NotePropertyName ArchiveSizeMB -NotePropertyValue (Get-ArchiveMB $m.PrimarySmtpAddress) -Force");
                     sb.AppendLine("    $obj");
                     sb.AppendLine("}");
                 }
@@ -325,6 +338,8 @@ namespace ExchangeAuditTool
             account.AddProp("RoomMailboxAccountEnabled", true);
             account.Add(new AuditOption("accountstatus", "Account activated / disabled (Get-User)", "accountstatus", false));
             account.Add(new AuditOption("mailboxsize", "Mailbox size in MB (Get-MailboxStatistics)", "mailboxsize", false).MarkSlow());
+            account.Add(new AuditOption("mailboxitemcount", "Item count (Get-MailboxStatistics)", "mailboxitemcount", false).MarkSlow());
+            account.Add(new AuditOption("archivesize", "Archive size in MB (per-mailbox, slower)", "archivesize", false).MarkSlow());
             section.AddGroup(account);
 
             var custom = new AuditOptionGroup("custom", "Tags / custom", GroupMode.MultiCheck); custom.Columns = 2;
@@ -420,6 +435,8 @@ namespace ExchangeAuditTool
                 List<string> contactProps = sel.Selected("contact");
                 bool acctStatus = sel.IsSelected("account", "accountstatus");
                 bool needSize = sel.IsSelected("account", "mailboxsize");
+                bool needCount = sel.IsSelected("account", "mailboxitemcount");
+                bool needArchive = sel.IsSelected("account", "archivesize");
                 bool needUser = acctStatus || contactProps.Count > 0;
 
                 if (cal.Contains("ResourceDelegates")) needResolver = true;
@@ -429,10 +446,12 @@ namespace ExchangeAuditTool
                 string getRecip = online ? "Get-EXORecipient" : "Get-Recipient";
                 string getStats = online ? "Get-EXOMailboxStatistics" : "Get-MailboxStatistics";
 
-                bool perRow = cal.Count > 0 || place.Count > 0 || needUser || needSize;
+                bool perRow = cal.Count > 0 || place.Count > 0 || needUser || needSize || needCount || needArchive;
 
                 var sb = new StringBuilder();
                 if (needSize) PsScriptHelpers.EmitSizeHelper(sb, getStats);
+                if (needCount) PsScriptHelpers.EmitCountHelper(sb, getStats);
+                if (needArchive) PsScriptHelpers.EmitArchiveMBHelper(sb, getStats);
                 if (needResolver) PsScriptHelpers.EmitResolver(sb, getRecip, false);
 
                 sb.AppendLine("Write-Host 'Querying " + (isRoom ? "room" : "equipment") + " mailboxes...'");
@@ -493,6 +512,10 @@ namespace ExchangeAuditTool
                     }
                     if (needSize)
                         sb.AppendLine("    $obj | Add-Member -NotePropertyName MailboxSizeMB -NotePropertyValue (Get-SizeMB $m.PrimarySmtpAddress) -Force");
+                    if (needCount)
+                        sb.AppendLine("    $obj | Add-Member -NotePropertyName MailboxItemCount -NotePropertyValue (Get-ItemCount $m.PrimarySmtpAddress) -Force");
+                    if (needArchive)
+                        sb.AppendLine("    $obj | Add-Member -NotePropertyName ArchiveSizeMB -NotePropertyValue (Get-ArchiveMB $m.PrimarySmtpAddress) -Force");
                     sb.AppendLine("    $obj");
                     sb.AppendLine("}");
                 }
