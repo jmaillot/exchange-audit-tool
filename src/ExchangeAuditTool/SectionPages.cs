@@ -5,6 +5,7 @@ using System.Drawing;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -85,6 +86,17 @@ namespace ExchangeAuditTool
                 if (!ok) return false;
             }
             return host.IndexOf('.') > 0;
+        }
+
+        private static bool IsValidCsvPath(string csv)
+        {
+            if (string.IsNullOrEmpty(csv)) return false;
+            if (csv.IndexOfAny(Path.GetInvalidPathChars()) >= 0) return false;
+            string file;
+            try { file = Path.GetFileName(csv); }
+            catch { return false; }
+            if (string.IsNullOrEmpty(file) || file.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) return false;
+            return csv.EndsWith(".csv", StringComparison.OrdinalIgnoreCase);
         }
 
         private sealed class SectionUi
@@ -666,7 +678,13 @@ namespace ExchangeAuditTool
         {
             AuditSection section = ui.Section;
             string csv = ui.OutputPath.Text.Trim();
-            if (string.IsNullOrEmpty(csv)) { Warn("Choose an output CSV path first."); return; }
+            if (!IsValidCsvPath(csv))
+            {
+                Warn("Choose a valid output CSV path (e.g. C:\\Exports\\audit.csv).");
+                ui.OutputPath.Focus();
+                ui.OutputPath.SelectAll();
+                return;
+            }
 
             var selection = new AuditSelection();
             foreach (var kv in ui.Checks)
@@ -692,9 +710,15 @@ namespace ExchangeAuditTool
             ui.CancelButton.Enabled = true;
             SetBusy(true);
             var sw = System.Diagnostics.Stopwatch.StartNew();
+            int streamedLines = 0;
             using (var tick = new System.Windows.Forms.Timer { Interval = 500 })
             {
-                tick.Tick += delegate { SetFooter("Running " + section.NavTitle + "... " + sw.Elapsed.ToString("mm\\:ss"), UiTheme.Orange); };
+                tick.Tick += delegate
+                {
+                    string elapsed = sw.Elapsed.ToString("mm\\:ss");
+                    int n = Interlocked.CompareExchange(ref streamedLines, 0, 0);
+                    SetFooter("Running " + section.NavTitle + "... " + elapsed + " · " + n + " lines", UiTheme.Orange);
+                };
                 tick.Start();
                 try
                 {
@@ -711,7 +735,14 @@ namespace ExchangeAuditTool
                     catch { }
                     try { if (File.Exists(csv)) File.Delete(csv); } catch { }
 
-                    var result = await RunPowerShellScriptAsync(full);
+                    var result = await Task.Run(delegate
+                    {
+                        return _ps.Execute(full, 1800000, delegate (string line)
+                        {
+                            Interlocked.Increment(ref streamedLines);
+                            AppendLog(line);
+                        });
+                    });
                     sw.Stop();
 
                     if (result.ExitCode == 0 && File.Exists(csv))
