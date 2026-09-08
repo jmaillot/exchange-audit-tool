@@ -204,6 +204,7 @@ namespace ExchangeAuditTool
 
         private static Button NewWindowButton(string glyph)
         {
+            string name = glyph == "close" ? "Close" : glyph == "max" ? "Maximize or restore" : "Minimize";
             var b = new Button
             {
                 Width = 46,
@@ -211,7 +212,9 @@ namespace ExchangeAuditTool
                 BackColor = Color.FromArgb(8, 18, 30),
                 Image = UiAssets.Render(glyph, 14),
                 ImageAlign = ContentAlignment.MiddleCenter,
-                TabStop = false
+                TabStop = false,
+                AccessibleName = name,
+                AccessibleDescription = name + " the Exchange Audit Tool window"
             };
             b.FlatAppearance.BorderSize = 0;
             b.FlatAppearance.MouseOverBackColor = Color.FromArgb(27, 41, 58);
