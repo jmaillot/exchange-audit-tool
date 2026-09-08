@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- Light theme: `◐` toggle in the title bar re-skins content live (dark title bar, sidebar and activity log stay as-is), persisted across launches
+
 ## [1.5.0] - 2026-09-08
 
 ### Added
