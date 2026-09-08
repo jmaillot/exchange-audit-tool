@@ -113,9 +113,19 @@ namespace ExchangeAuditTool
             public Label EmptyState;
             public string LastCsv;
             public string Filter;
+            public PowerShellSession Ps;
+            public CancellationTokenSource RunCts;
         }
 
         private readonly Dictionary<string, SectionUi> _sectionUi = new Dictionary<string, SectionUi>();
+
+        // Parallel audits: each section runs on its own powershell.exe process
+        // (PowerShellSession is process-isolated), gated by a global slot count
+        // so Exchange throttling stays out of the picture. The shared _ps
+        // remains the control session (connect/disconnect/module checks).
+        private const int MaxParallelAudits = 3;
+        private readonly SemaphoreSlim _runSlots = new SemaphoreSlim(MaxParallelAudits, MaxParallelAudits);
+        private int _runningAudits;
 
         private Control BuildConnectionPage()
         {
@@ -610,7 +620,12 @@ namespace ExchangeAuditTool
             ui.RunButton.Click += async delegate { await RunSectionAsync(ui); };
             _optionTip.SetToolTip(ui.RunButton, "Connect to Exchange first");
             ui.CancelButton = new ModernButton { Text = "Cancel", Dock = DockStyle.Right, Width = 110, Height = 42, Enabled = false };
-            ui.CancelButton.Click += delegate { AppendLog("Cancellation requested..."); _ps.Cancel(); };
+            ui.CancelButton.Click += delegate
+            {
+                AppendLog("Cancellation requested for " + ui.Section.NavTitle + "...");
+                if (ui.RunCts != null) { try { ui.RunCts.Cancel(); } catch { } }
+                if (ui.Ps != null) ui.Ps.Cancel();
+            };
             var buttonsRow = new Panel { Dock = DockStyle.Bottom, Height = 42, BackColor = UiTheme.Window };
             buttonsRow.Controls.Add(ui.RunButton);
             buttonsRow.Controls.Add(ui.CancelButton);
@@ -821,22 +836,42 @@ namespace ExchangeAuditTool
 
             string full = ConnectionSettings.BuildPrelude() + Environment.NewLine + body;
 
+            if (ui.Ps == null) ui.Ps = new PowerShellSession();
+            PowerShellSession session = ui.Ps;
+            var cts = new CancellationTokenSource();
+            ui.RunCts = cts;
+
             ui.RunButton.Enabled = false;
             ui.CancelButton.Enabled = true;
-            SetBusy(true);
+            if (Interlocked.Increment(ref _runningAudits) == 1) SetBusy(true);
             var sw = System.Diagnostics.Stopwatch.StartNew();
             int streamedLines = 0;
-            using (var tick = new System.Windows.Forms.Timer { Interval = 500 })
+            bool slotTaken = false;
+            try
             {
-                tick.Tick += delegate
+                SetResult(ui, "◷ Queued - waiting for a free run slot (max " + MaxParallelAudits + " parallel)...", UiTheme.Orange);
+                try { await _runSlots.WaitAsync(cts.Token); }
+                catch (OperationCanceledException)
                 {
-                    string elapsed = sw.Elapsed.ToString("mm\\:ss");
-                    int n = Interlocked.CompareExchange(ref streamedLines, 0, 0);
-                    SetFooter("Running " + section.NavTitle + "... " + elapsed + " · " + n + " lines", UiTheme.Orange);
-                };
-                tick.Start();
-                try
+                    SetResult(ui, "✗ Cancelled before start.", UiTheme.Orange);
+                    SetFooter(section.NavTitle + " cancelled", UiTheme.Orange);
+                    return;
+                }
+                slotTaken = true;
+                using (var tick = new System.Windows.Forms.Timer { Interval = 500 })
                 {
+                    tick.Tick += delegate
+                    {
+                        string elapsed = sw.Elapsed.ToString("mm\\:ss");
+                        int n = Interlocked.CompareExchange(ref streamedLines, 0, 0);
+                        string msg = "Running " + section.NavTitle + "... " + elapsed + " · " + n + " lines";
+                        SetFooter(msg, UiTheme.Orange);
+                        ui.ResultInfo.Text = "◷ " + msg;
+                        ui.ResultInfo.ForeColor = UiTheme.Orange;
+                    };
+                    tick.Start();
+                    try
+                    {
                     SetFooter("Running " + section.NavTitle + "... 00:00", UiTheme.Orange);
                     AppendLog("=== " + section.Title + " ===");
                     AppendLog(ConnectionSettings.Summary());
@@ -852,7 +887,7 @@ namespace ExchangeAuditTool
 
                     var result = await Task.Run(delegate
                     {
-                        return _ps.Execute(full, 1800000, delegate (string line)
+                        return session.Execute(full, 1800000, delegate (string line)
                         {
                             Interlocked.Increment(ref streamedLines);
                             AppendLog(line);
@@ -889,15 +924,22 @@ namespace ExchangeAuditTool
                         SetResult(ui, "✗ Run failed in " + sw.Elapsed.ToString("mm\\:ss") + " - see the activity log.", UiTheme.Red);
                         SetFooter(section.NavTitle + " failed", UiTheme.Red);
                     }
+                    }
+                    finally
+                    {
+                        tick.Stop();
+                        sw.Stop();
+                    }
                 }
-                finally
-                {
-                    tick.Stop();
-                    sw.Stop();
-                    SetBusy(false);
-                    ui.RunButton.Enabled = _isConnected;
-                    ui.CancelButton.Enabled = false;
-                }
+            }
+            finally
+            {
+                if (slotTaken) { try { _runSlots.Release(); } catch { } }
+                ui.RunCts = null;
+                try { cts.Dispose(); } catch { }
+                if (Interlocked.Decrement(ref _runningAudits) == 0) SetBusy(false);
+                ui.RunButton.Enabled = _isConnected;
+                ui.CancelButton.Enabled = false;
             }
         }
 
@@ -957,6 +999,18 @@ namespace ExchangeAuditTool
             }
             catch { }
             finally { _ps.Dispose(); }
+            foreach (var kv in _sectionUi)
+            {
+                PowerShellSession ps = kv.Value.Ps;
+                if (ps == null) continue;
+                try
+                {
+                    if (ps.IsAlive) ps.Execute(ConnectionSettings.BuildDisconnect(), 10000, null);
+                }
+                catch { }
+                try { ps.Dispose(); }
+                catch { }
+            }
         }
 
         private int LoadCsvIntoGrid(DataGridView grid, string path, int maxRows)

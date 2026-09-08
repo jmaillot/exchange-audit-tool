@@ -76,7 +76,7 @@ Output: `dist/ExchangeAuditTool_<version>.exe` (version taken from `AssemblyFile
 
 1. Launch `ExchangeAuditTool_<version>.exe`.
 2. Connection page: pick a mode, fill UPN / AppId / server fields, `Connect`. Status is verified with `Get-ConnectionInformation` / `Get-OrganizationConfig`.
-3. Pick a section in the sidebar (e.g. User mailboxes), tick properties, set Output CSV (default `%USERPROFILE%\Documents\ExchangeAudit\`), `RUN AUDIT`.
+3. Pick a section in the sidebar (e.g. User mailboxes), tick properties, set Output CSV (default `%USERPROFILE%\Documents\ExchangeAudit\`), `RUN AUDIT`. Sections run in parallel (up to 3 at a time, extras queue); each has its own Cancel and live progress in its Results header.
 4. Watch the Activity Log (also written to `ExchangeAuditTool.activity.log`). On success the CSV is written by PowerShell (`Export-Csv -Delimiter ';'`) and previewed in the grid. `Open CSV` opens it with the default handler.
 
 Notes:

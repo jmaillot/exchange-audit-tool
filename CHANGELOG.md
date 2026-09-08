@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- Parallel section audits: each section runs on its own PowerShell process (up to 3 concurrent, extras queue with visible status), per-section Cancel, live per-section progress
+
 ## [1.2.2] - 2026-09-08
 
 ### Added
