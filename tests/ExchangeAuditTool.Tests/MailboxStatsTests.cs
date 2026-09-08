@@ -55,10 +55,10 @@ namespace ExchangeAuditTool.Tests
             string script = section.BuildScript(sel, ctx);
             Assert.Contains("Get-ItemCount", script);
             Assert.Contains("Get-ArchiveMB", script);
-            Assert.Contains("Get-ArchiveCount", script);
             Assert.Contains("MailboxItemCount", script);
             Assert.Contains("ArchiveSizeMB", script);
-            Assert.Contains("ArchiveItemCount", script);
+            Assert.DoesNotContain("Get-ArchiveCount", script);
+            Assert.DoesNotContain("ArchiveItemCount", script);
         }
 
         [Fact]
@@ -79,6 +79,7 @@ namespace ExchangeAuditTool.Tests
             string script = section.BuildScript(With("complementary", "mailboxitemcount", "complementary", "archivesize"), ctx);
             Assert.Contains("Get-ItemCount", script);
             Assert.Contains("Get-ArchiveMB", script);
+            Assert.DoesNotContain("Get-ArchiveCount", script);
         }
 
         [Fact]

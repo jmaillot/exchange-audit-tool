@@ -61,7 +61,7 @@ namespace ExchangeAuditTool
             sb.AppendLine();
         }
 
-        public static void EmitArchiveHelpers(StringBuilder sb, string getStatsCmd)
+        public static void EmitArchiveMBHelper(StringBuilder sb, string getStatsCmd)
         {
             sb.AppendLine("function Get-ArchiveMB {");
             sb.AppendLine("    param($identity)");
@@ -71,14 +71,6 @@ namespace ExchangeAuditTool
             sb.AppendLine("            $s = $st.TotalItemSize.ToString()");
             sb.AppendLine("            if ($s -match '\\(([\\d,]+) bytes\\)') { return [math]::Round(([double]($matches[1] -replace ',','')) / 1MB, 2) }");
             sb.AppendLine("        }");
-            sb.AppendLine("    } catch { }");
-            sb.AppendLine("    return ''");
-            sb.AppendLine("}");
-            sb.AppendLine("function Get-ArchiveCount {");
-            sb.AppendLine("    param($identity)");
-            sb.AppendLine("    try {");
-            sb.AppendLine("        $st = " + getStatsCmd + " -Identity $identity -Archive -ErrorAction Stop");
-            sb.AppendLine("        if ($st -and $null -ne $st.ItemCount) { return $st.ItemCount }");
             sb.AppendLine("    } catch { }");
             sb.AppendLine("    return ''");
             sb.AppendLine("}");

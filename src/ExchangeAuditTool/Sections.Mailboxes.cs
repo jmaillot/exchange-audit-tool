@@ -214,7 +214,7 @@ namespace ExchangeAuditTool
             extra.Add(new AuditOption("grantsendonbehalf", "Send on Behalf (GrantSendOnBehalfTo, resolved to SMTP)", "grantsendonbehalf", false));
             extra.Add(new AuditOption("mailboxsize", "Mailbox size in MB (Get-MailboxStatistics)", "mailboxsize", false).MarkSlow());
             extra.Add(new AuditOption("mailboxitemcount", "Item count (Get-MailboxStatistics)", "mailboxitemcount", false).MarkSlow());
-            extra.Add(new AuditOption("archivesize", "Archive size MB + items (per-mailbox, slower)", "archivesize", false).MarkSlow());
+            extra.Add(new AuditOption("archivesize", "Archive size in MB (per-mailbox, slower)", "archivesize", false).MarkSlow());
             extra.Add(new AuditOption("regional", "Regional config (Language, TimeZone) - per-mailbox, slower", "regional", false).MarkSlow());
             section.AddGroup(extra);
 
@@ -308,7 +308,7 @@ namespace ExchangeAuditTool
 
                 if (needSize) PsScriptHelpers.EmitSizeHelper(sb, getStats);
                 if (needCount) PsScriptHelpers.EmitCountHelper(sb, getStats);
-                if (needArchive) PsScriptHelpers.EmitArchiveHelpers(sb, getStats);
+                if (needArchive) PsScriptHelpers.EmitArchiveMBHelper(sb, getStats);
 
                 sb.AppendLine("Write-Host 'Querying USER mailboxes...'");
                 sb.AppendLine("$mbx = @(" + getMbx + " -ResultSize " + resultSize + " -RecipientTypeDetails UserMailbox" + propsArg + ")");
@@ -404,10 +404,7 @@ namespace ExchangeAuditTool
                     if (needCount)
                         sb.AppendLine("    $obj | Add-Member -NotePropertyName MailboxItemCount -NotePropertyValue (Get-ItemCount $m.PrimarySmtpAddress) -Force");
                     if (needArchive)
-                    {
                         sb.AppendLine("    $obj | Add-Member -NotePropertyName ArchiveSizeMB -NotePropertyValue (Get-ArchiveMB $m.PrimarySmtpAddress) -Force");
-                        sb.AppendLine("    $obj | Add-Member -NotePropertyName ArchiveItemCount -NotePropertyValue (Get-ArchiveCount $m.PrimarySmtpAddress) -Force");
-                    }
                     sb.AppendLine("    $obj");
                     sb.AppendLine("}");
                 }
