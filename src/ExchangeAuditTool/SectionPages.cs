@@ -459,9 +459,23 @@ namespace ExchangeAuditTool
 
             var optionsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(16, 14, 16, 14), AutoScroll = true };
 
-            var headerRow = new Panel { Dock = DockStyle.Top, Height = 26, BackColor = UiTheme.Surface };
+            var headerRow = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = UiTheme.Surface };
             var scopeBadge = new Label { Text = ScopeText(section.Scope), Dock = DockStyle.Left, Width = 240, ForeColor = UiTheme.Orange, Font = new Font("Segoe UI Semibold", 8F), TextAlign = ContentAlignment.MiddleLeft };
-            var selectAllBtn = new ModernButton { Text = "Select all", Dock = DockStyle.Right, Width = 110, Height = 24, Padding = new Padding(0) };
+            var selectAllBtn = new ModernButton { Text = "Select all", Dock = DockStyle.Right, Width = 130, Height = 32, Padding = new Padding(0) };
+            Action updateSelectAll = delegate
+            {
+                int total = 0;
+                int on = 0;
+                foreach (var kv in ui.Checks)
+                    foreach (CheckBox cb in kv.Value)
+                    {
+                        total++;
+                        if (cb.Checked) on++;
+                    }
+                if (total > 0 && on == total) selectAllBtn.Text = "Deselect all";
+                else if (on == 0) selectAllBtn.Text = "Select all";
+                else selectAllBtn.Text = "Select all (" + on + "/" + total + ")";
+            };
             selectAllBtn.Click += delegate
             {
                 bool anyUnchecked = false;
@@ -472,7 +486,7 @@ namespace ExchangeAuditTool
                 foreach (var kv in ui.Checks)
                     foreach (CheckBox cb in kv.Value)
                         cb.Checked = target;
-                selectAllBtn.Text = target ? "Deselect all" : "Select all";
+                updateSelectAll();
             };
             headerRow.Controls.Add(selectAllBtn);
             headerRow.Controls.Add(scopeBadge);
@@ -517,8 +531,9 @@ namespace ExchangeAuditTool
 
             foreach (var kv in ui.Checks)
                 foreach (CheckBox cb in kv.Value)
-                    cb.CheckedChanged += delegate { slowHint.Visible = HasSlowOptions(ui); };
+                    cb.CheckedChanged += delegate { slowHint.Visible = HasSlowOptions(ui); updateSelectAll(); };
             slowHint.Visible = HasSlowOptions(ui);
+            updateSelectAll();
 
             var resultsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(12, 10, 12, 12) };
             var rHead = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = UiTheme.Surface };
