@@ -21,7 +21,8 @@ Connection modes:
 
 | Area | Sections |
 |---|---|
-| User mailboxes | User mailboxes (quotas, retention, archive, permissions, folder permissions, size, item counts), mobile devices |
+| User mailboxes | User mailboxes (quotas, retention, archive, permissions, folder permissions, size, item counts) |
+| Mobile | Mobile device partnerships (type, model, OS, access state, sync times) |
 | Special mailboxes | Shared, room and equipment mailboxes (delegates, calendar processing, folder permissions) |
 | Groups | Distribution, security, dynamic and Microsoft 365 groups (owners, members) |
 | Contacts | Mail users, mail contacts |

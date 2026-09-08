@@ -451,7 +451,7 @@ namespace ExchangeAuditTool
                 "Audit mobile partnerships (Get-MobileDevice): wipe / re-enroll planning. One call per mailbox.",
                 "mobile",
                 AuditScope.Both);
-            section.Category = "Mailboxes";
+            section.Category = "Mobile";
             section.DefaultFileName = "MobileDevices.csv";
 
             var devices = new AuditOptionGroup("devices", "Device properties", GroupMode.MultiCheck); devices.Columns = 2;

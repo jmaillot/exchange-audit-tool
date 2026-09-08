@@ -37,7 +37,7 @@ namespace ExchangeAuditTool.Tests
         {
             AuditSection section = Find("mobile-devices");
             Assert.NotNull(section);
-            Assert.Equal("Mailboxes", section.Category);
+            Assert.Equal("Mobile", section.Category);
             Assert.Equal(AuditScope.Both, section.Scope);
             var ctx = new ScriptContext("C:\\Exports\\MobileDevices.csv");
             string script = section.BuildScript(new AuditSelection(), ctx);
