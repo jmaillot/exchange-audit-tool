@@ -11,6 +11,10 @@ All notable changes to this project are documented here. Format follows Keep a C
 - Serialized worker sign-in: parallel audits prompt once and follow-ups reuse the cached session instead of prompting per worker
 - Single sign-in guarantee: modes that can prompt (interactive, Basic/credential dialog) run audits on the connected session one at a time instead of prompting per worker
 
+### Fixed
+
+- XLSX writer delegates content types/relationships to the packaging API instead of colliding hand-written parts, emits `cols` before `sheetData`, and surfaces failures in the result line instead of the log only
+
 ## [1.2.2] - 2026-09-08
 
 ### Added

@@ -974,7 +974,11 @@ namespace ExchangeAuditTool
                                 ui.OpenXlsxButton.Enabled = true;
                                 SetResult(ui, ui.ResultInfo.Text + " + XLSX (" + xr.DataRows + " rows" + (xr.Truncated ? ", truncated to Excel limits" : "") + ").", UiTheme.Green);
                             }
-                            else AppendLog("[xlsx] workbook not written: " + xr.Error);
+                            else
+                            {
+                                AppendLog("[xlsx] workbook not written: " + xr.Error);
+                                SetResult(ui, ui.ResultInfo.Text + " (XLSX failed: " + xr.Error + ").", UiTheme.Green);
+                            }
                         }
                         SetFooter(section.NavTitle + " done in " + took, UiTheme.Green);
                         if (!_isConnected) await RefreshConnectedAsAsync();
