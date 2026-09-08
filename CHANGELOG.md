@@ -7,6 +7,7 @@ All notable changes to this project are documented here. Format follows Keep a C
 ### Added
 
 - Saved connection profiles: name, save, delete and auto-restore last-used connection fields (`profiles.json` next to the activity log; passwords are never stored)
+- Connection page guidance banner (profile-or-UPN hint, hides once either is set)
 
 ### Changed
 

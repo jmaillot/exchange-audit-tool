@@ -166,6 +166,10 @@ namespace ExchangeAuditTool
             profileRow.Controls.Add(profileDelete);
             profileRow.Controls.Add(profileSave);
 
+            var helperRow = new Panel { Dock = DockStyle.Top, Height = 48, BackColor = UiTheme.Window, Padding = new Padding(0, 8, 0, 0) };
+            var helperLabel = new Label { Text = "Choose an existing profile above, or set your UserPrincipalName below.", Dock = DockStyle.Fill, ForeColor = Color.FromArgb(147, 183, 255), Font = new Font("Segoe UI Semibold", 11F), TextAlign = ContentAlignment.MiddleCenter, BackColor = UiTheme.Window };
+            helperRow.Controls.Add(helperLabel);
+
             var modeGroup = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(0, 4, 0, 4) };
             var rInteractive = NewRadio("Exchange Online (interactive)", true);
             var rApp = NewRadio("Exchange Online (app-only cert)", false);
@@ -243,6 +247,14 @@ namespace ExchangeAuditTool
 
             // ---- Saved connection profiles: state above, logic here ------------
             // (field/radio locals are only declared further down).
+            Action updateHelper = delegate
+            {
+                string sel = profileBox.SelectedItem as string;
+                bool hasProfile = !string.IsNullOrEmpty(sel);
+                bool hasUpn = ((tbUpn.Text ?? "").Trim().Length > 0);
+                helperRow.Visible = rInteractive.Checked && !hasProfile && !hasUpn;
+            };
+
             Func<ConnectionProfile> captureProfile = delegate
             {
                 var p = new ConnectionProfile();
@@ -279,6 +291,7 @@ namespace ExchangeAuditTool
                 rBasic.Checked = p.RemoteAuth == RemoteAuthMode.Basic;
                 rKerb.Checked = p.RemoteAuth != RemoteAuthMode.Basic;
                 cbHttps.Checked = p.RemoteUseHttps;
+                updateHelper();
                 AppendLog("Profile applied: " + p.Name);
             };
 
@@ -343,6 +356,12 @@ namespace ExchangeAuditTool
             _optionTip.SetToolTip(profileBox, "Pick a saved connection or type a new name, then Save");
             _optionTip.SetToolTip(profileSave, "Save the current connection fields under this name");
             _optionTip.SetToolTip(profileDelete, "Delete the selected profile (passwords are never stored)");
+            profileBox.TextChanged += delegate { updateHelper(); };
+            tbUpn.TextChanged += delegate { updateHelper(); };
+            rInteractive.CheckedChanged += delegate { updateHelper(); };
+            rApp.CheckedChanged += delegate { updateHelper(); };
+            rLocal.CheckedChanged += delegate { updateHelper(); };
+            rRemote.CheckedChanged += delegate { updateHelper(); };
 
             var fields = new Panel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, Padding = new Padding(0, 8, 0, 0) };
             fields.Controls.Add(rowLocalInfo);
@@ -526,6 +545,8 @@ namespace ExchangeAuditTool
             card.Controls.Add(modeGroup);
             card.Controls.Add(head);
             card.Controls.Add(profileRow);
+            updateHelper();
+            page.Controls.Add(helperRow);
             page.Controls.Add(card);
             return page;
         }
