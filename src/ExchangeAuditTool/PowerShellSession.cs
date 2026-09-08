@@ -20,6 +20,8 @@ namespace ExchangeAuditTool
 
         public bool IsAlive { get { return _proc != null && !_proc.HasExited; } }
 
+        public bool IsBusy { get { return _gate.CurrentCount == 0; } }
+
         public void Start()
         {
             if (IsAlive) return;

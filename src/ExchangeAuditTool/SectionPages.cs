@@ -115,6 +115,7 @@ namespace ExchangeAuditTool
             public string Filter;
             public PowerShellSession Ps;
             public CancellationTokenSource RunCts;
+            public PowerShellSession ActiveSession;
         }
 
         private readonly Dictionary<string, SectionUi> _sectionUi = new Dictionary<string, SectionUi>();
@@ -126,6 +127,12 @@ namespace ExchangeAuditTool
         private const int MaxParallelAudits = 3;
         private readonly SemaphoreSlim _runSlots = new SemaphoreSlim(MaxParallelAudits, MaxParallelAudits);
         private int _runningAudits;
+
+        // Prompt modes (interactive sign-in, Basic/credential dialog) share one
+        // audit session so the user authenticates exactly once; audits queue on
+        // it instead of running in parallel.
+        private readonly PowerShellSession _sharedAudit = new PowerShellSession();
+        private readonly SemaphoreSlim _sharedAuditGate = new SemaphoreSlim(1, 1);
 
         // Worker sign-in is serialized: the first worker prompts (browser /
         // credential dialog) and follow-ups reuse the cached token, so parallel
@@ -629,7 +636,8 @@ namespace ExchangeAuditTool
             {
                 AppendLog("Cancellation requested for " + ui.Section.NavTitle + "...");
                 if (ui.RunCts != null) { try { ui.RunCts.Cancel(); } catch { } }
-                if (ui.Ps != null) ui.Ps.Cancel();
+                PowerShellSession active = ui.ActiveSession;
+                if (active != null && active.IsBusy) active.Cancel();
             };
             var buttonsRow = new Panel { Dock = DockStyle.Bottom, Height = 42, BackColor = UiTheme.Window };
             buttonsRow.Controls.Add(ui.RunButton);
@@ -841,10 +849,26 @@ namespace ExchangeAuditTool
 
             string prelude = ConnectionSettings.BuildPrelude();
 
-            if (ui.Ps == null) ui.Ps = new PowerShellSession();
-            PowerShellSession session = ui.Ps;
+            bool shared = ConnectionSettings.RequiresInteractiveAuth;
+            PowerShellSession session;
+            SemaphoreSlim gate;
+            int cap;
+            if (shared)
+            {
+                session = _sharedAudit;
+                gate = _sharedAuditGate;
+                cap = 1;
+            }
+            else
+            {
+                if (ui.Ps == null) ui.Ps = new PowerShellSession();
+                session = ui.Ps;
+                gate = _runSlots;
+                cap = MaxParallelAudits;
+            }
             var cts = new CancellationTokenSource();
             ui.RunCts = cts;
+            ui.ActiveSession = session;
 
             ui.RunButton.Enabled = false;
             ui.CancelButton.Enabled = true;
@@ -854,8 +878,8 @@ namespace ExchangeAuditTool
             bool slotTaken = false;
             try
             {
-                SetResult(ui, "◷ Queued - waiting for a free run slot (max " + MaxParallelAudits + " parallel)...", UiTheme.Orange);
-                try { await _runSlots.WaitAsync(cts.Token); }
+                SetResult(ui, "◷ Queued - waiting for a free run slot (max " + cap + " parallel)...", UiTheme.Orange);
+                try { await gate.WaitAsync(cts.Token); }
                 catch (OperationCanceledException)
                 {
                     SetResult(ui, "✗ Cancelled before start.", UiTheme.Orange);
@@ -953,8 +977,9 @@ namespace ExchangeAuditTool
             }
             finally
             {
-                if (slotTaken) { try { _runSlots.Release(); } catch { } }
+                if (slotTaken) { try { gate.Release(); } catch { } }
                 ui.RunCts = null;
+                ui.ActiveSession = null;
                 try { cts.Dispose(); } catch { }
                 if (Interlocked.Decrement(ref _runningAudits) == 0) SetBusy(false);
                 ui.RunButton.Enabled = _isConnected;
@@ -1018,6 +1043,8 @@ namespace ExchangeAuditTool
             }
             catch { }
             finally { _ps.Dispose(); }
+            try { _sharedAudit.Dispose(); }
+            catch { }
             foreach (var kv in _sectionUi)
             {
                 PowerShellSession ps = kv.Value.Ps;

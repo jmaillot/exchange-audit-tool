@@ -40,6 +40,20 @@ namespace ExchangeAuditTool
             get { return Mode == ConnectionMode.ExchangeOnlineInteractive || Mode == ConnectionMode.ExchangeOnlineApp; }
         }
 
+        // True when establishing a session can prompt (browser sign-in or
+        // credential dialog). Such modes share a single audit session so the
+        // user signs in exactly once; prompt-free modes run in parallel.
+        public static bool RequiresInteractiveAuth
+        {
+            get
+            {
+                if (Mode == ConnectionMode.ExchangeOnlineInteractive) return true;
+                if (Mode == ConnectionMode.OnPremisesRemote)
+                    return RemoteAuth == RemoteAuthMode.Basic || !string.IsNullOrEmpty(RemoteUser);
+                return false;
+            }
+        }
+
         public static string BuildPrelude()
         {
             var sb = new StringBuilder();
