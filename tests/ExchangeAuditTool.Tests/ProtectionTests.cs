@@ -27,11 +27,15 @@ namespace ExchangeAuditTool.Tests
                 { "antispamout", "Get-HostedOutboundSpamFilterPolicy" },
                 { "antimalware", "Get-MalwareFilterPolicy" },
                 { "antiphish", "Get-AntiPhishPolicy" },
+                { "safelinks", "Get-SafeLinksPolicy" },
+                { "safeattachments", "Get-SafeAttachmentPolicy" },
                 { "dlp", "Get-DlpPolicy" },
                 { "ruleantispamin", "Get-HostedContentFilterRule" },
                 { "ruleantispamout", "Get-HostedOutboundSpamFilterRule" },
                 { "ruleantimalware", "Get-MalwareFilterRule" },
-                { "ruleantiphish", "Get-AntiPhishRule" }
+                { "ruleantiphish", "Get-AntiPhishRule" },
+                { "rulesafelinks", "Get-SafeLinksRule" },
+                { "rulesafeattachments", "Get-SafeAttachmentRule" }
             })
             {
                 var sel = new AuditSelection();
@@ -49,6 +53,10 @@ namespace ExchangeAuditTool.Tests
             sel.Set("object", new List<string>(new string[] { "ruleantiphish" }));
             string script = section.BuildScript(sel, ctx);
             Assert.Contains("AntiPhishPolicy", script);
+
+            var sel2 = new AuditSelection();
+            sel2.Set("object", new List<string>(new string[] { "rulesafelinks" }));
+            Assert.Contains("SafeLinksPolicy", section.BuildScript(sel2, ctx));
         }
     }
 }

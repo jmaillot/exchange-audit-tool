@@ -18,7 +18,7 @@ namespace ExchangeAuditTool
         private static readonly List<string> MultiValued = new List<string>(new string[]
         {
             "AllowedSenders", "BlockedSenders", "AllowedSenderDomains", "BlockedSenderDomains",
-            "FileTypes"
+            "FileTypes", "DoNotRewriteUrls"
         });
 
         private static string BuildSelectList(List<string> chosen)
@@ -45,7 +45,7 @@ namespace ExchangeAuditTool
                 "protection-policies",
                 "Protection policies",
                 "Protection policy export",
-                "Audit Exchange Online Protection and DLP (anti-spam, anti-malware, anti-phish, DLP). One object per run.",
+                "Audit Exchange Online Protection, Safe Links/Attachments and DLP (policies + rules). One object per run.",
                 "shield",
                 AuditScope.ExchangeOnline);
             section.Category = "Protection";
@@ -56,11 +56,15 @@ namespace ExchangeAuditTool
             obj.Add(new AuditOption("antispamout", "Anti-spam outbound (Get-HostedOutboundSpamFilterPolicy)", "antispamout", false));
             obj.Add(new AuditOption("antimalware", "Anti-malware (Get-MalwareFilterPolicy)", "antimalware", false));
             obj.Add(new AuditOption("antiphish", "Anti-phishing (Get-AntiPhishPolicy)", "antiphish", false));
+            obj.Add(new AuditOption("safelinks", "Safe Links (Get-SafeLinksPolicy)", "safelinks", false));
+            obj.Add(new AuditOption("safeattachments", "Safe Attachments (Get-SafeAttachmentPolicy)", "safeattachments", false));
             obj.Add(new AuditOption("dlp", "DLP policies (Get-DlpPolicy)", "dlp", false));
             obj.Add(new AuditOption("ruleantispamin", "Anti-spam inbound rules (Get-HostedContentFilterRule)", "ruleantispamin", false));
             obj.Add(new AuditOption("ruleantispamout", "Anti-spam outbound rules (Get-HostedOutboundSpamFilterRule)", "ruleantispamout", false));
             obj.Add(new AuditOption("ruleantimalware", "Anti-malware rules (Get-MalwareFilterRule)", "ruleantimalware", false));
             obj.Add(new AuditOption("ruleantiphish", "Anti-phishing rules (Get-AntiPhishRule)", "ruleantiphish", false));
+            obj.Add(new AuditOption("rulesafelinks", "Safe Links rules (Get-SafeLinksRule)", "rulesafelinks", false));
+            obj.Add(new AuditOption("rulesafeattachments", "Safe Attachments rules (Get-SafeAttachmentRule)", "rulesafeattachments", false));
             section.AddGroup(obj);
 
             var antispamin = new AuditOptionGroup("antispamin", "Inbound spam properties", GroupMode.MultiCheck); antispamin.Columns = 2;
@@ -110,6 +114,27 @@ namespace ExchangeAuditTool
             antiphish.AddProp("PhishThresholdLevel", false);
             section.AddGroup(antiphish);
 
+            var safelinks = new AuditOptionGroup("safelinks", "Safe Links properties", GroupMode.MultiCheck); safelinks.Columns = 2;
+            safelinks.AddProp("Name", false);
+            safelinks.AddProp("Enabled", false);
+            safelinks.AddProp("TrackClicks", false);
+            safelinks.AddProp("AllowClickThrough", false);
+            safelinks.AddProp("ScanUrls", false);
+            safelinks.AddProp("EnableForInternalSenders", false);
+            safelinks.AddProp("DoNotAllowClickThrough", false);
+            safelinks.AddProp("DoNotRewriteUrls", false);
+            section.AddGroup(safelinks);
+
+            var safeattachments = new AuditOptionGroup("safeattachments", "Safe Attachments properties", GroupMode.MultiCheck); safeattachments.Columns = 2;
+            safeattachments.AddProp("Name", false);
+            safeattachments.AddProp("Enable", false);
+            safeattachments.AddProp("Action", false);
+            safeattachments.AddProp("Redirect", false);
+            safeattachments.AddProp("RedirectAddress", false);
+            safeattachments.AddProp("ActionOnError", false);
+            safeattachments.AddProp("QuarantineTag", false);
+            section.AddGroup(safeattachments);
+
             var dlp = new AuditOptionGroup("dlp", "DLP properties", GroupMode.MultiCheck); dlp.Columns = 2;
             dlp.AddProp("Name", false);
             dlp.AddProp("State", false);
@@ -136,11 +161,15 @@ namespace ExchangeAuditTool
                 if (which == "antispamout") { cmdlet = "Get-HostedOutboundSpamFilterPolicy"; propGroup = "antispamout"; label = "outbound spam policies"; }
                 else if (which == "antimalware") { cmdlet = "Get-MalwareFilterPolicy"; propGroup = "antimalware"; label = "malware policies"; }
                 else if (which == "antiphish") { cmdlet = "Get-AntiPhishPolicy"; propGroup = "antiphish"; label = "phish policies"; }
+                else if (which == "safelinks") { cmdlet = "Get-SafeLinksPolicy"; propGroup = "safelinks"; label = "Safe Links policies"; }
+                else if (which == "safeattachments") { cmdlet = "Get-SafeAttachmentPolicy"; propGroup = "safeattachments"; label = "Safe Attachments policies"; }
                 else if (which == "dlp") { cmdlet = "Get-DlpPolicy"; propGroup = "dlp"; label = "DLP policies"; }
                 else if (which == "ruleantispamin") { cmdlet = "Get-HostedContentFilterRule"; propGroup = "ruleprops"; label = "inbound spam rules"; ruleLink = "HostedContentFilterPolicy"; }
                 else if (which == "ruleantispamout") { cmdlet = "Get-HostedOutboundSpamFilterRule"; propGroup = "ruleprops"; label = "outbound spam rules"; ruleLink = "HostedOutboundSpamFilterPolicy"; }
                 else if (which == "ruleantimalware") { cmdlet = "Get-MalwareFilterRule"; propGroup = "ruleprops"; label = "malware rules"; ruleLink = "MalwareFilterPolicy"; }
                 else if (which == "ruleantiphish") { cmdlet = "Get-AntiPhishRule"; propGroup = "ruleprops"; label = "phish rules"; ruleLink = "AntiPhishPolicy"; }
+                else if (which == "rulesafelinks") { cmdlet = "Get-SafeLinksRule"; propGroup = "ruleprops"; label = "Safe Links rules"; ruleLink = "SafeLinksPolicy"; }
+                else if (which == "rulesafeattachments") { cmdlet = "Get-SafeAttachmentRule"; propGroup = "ruleprops"; label = "Safe Attachments rules"; ruleLink = "SafeAttachmentPolicy"; }
                 else { cmdlet = "Get-HostedContentFilterPolicy"; propGroup = "antispamin"; label = "inbound spam policies"; }
 
                 var chosen = Collect(sel, propGroup);
