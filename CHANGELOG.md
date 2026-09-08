@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-09-08
+
 ### Added
 
 - `mobile-devices` section: per-mailbox partnerships (type, model, OS, access state, sync times) for wipe/re-enroll planning, in its own Mobile category
