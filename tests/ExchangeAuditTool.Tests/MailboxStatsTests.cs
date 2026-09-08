@@ -83,6 +83,38 @@ namespace ExchangeAuditTool.Tests
         }
 
         [Fact]
+        public void FolderPermissions_EmittedForUserAndShared()
+        {
+            var ctx = new ScriptContext("C:\\Exports\\x.csv");
+
+            AuditSection users = Find("mailbox-list");
+            var sel = new AuditSelection();
+            sel.Set("folderperms", new List<string>(new string[] { "Inbox" }));
+            string userScript = users.BuildScript(sel, ctx);
+            Assert.Contains("Get-MailboxFolderPermission", userScript);
+            Assert.Contains("FolderPerm_Inbox", userScript);
+
+            AuditSection shared = Find("shared-mailboxes");
+            bool hasSentItems = false;
+            bool hasContacts = false;
+            bool hasTasks = false;
+            foreach (AuditOptionGroup g in shared.Groups)
+            {
+                if (g.Key != "folderperms") continue;
+                foreach (AuditOption o in g.Options)
+                {
+                    if (o.Value == "SentItems") hasSentItems = true;
+                    if (o.Value == "Contacts") hasContacts = true;
+                    if (o.Value == "Tasks") hasTasks = true;
+                }
+            }
+            Assert.True(hasSentItems && hasContacts && hasTasks);
+            var sel2 = new AuditSelection();
+            sel2.Set("folderperms", new List<string>(new string[] { "SentItems" }));
+            Assert.Contains("FolderPerm_SentItems", shared.BuildScript(sel2, ctx));
+        }
+
+        [Fact]
         public void SendConnector_ContainsTlsCertificateName()
         {
             ConnectionMode saved = ConnectionSettings.Mode;

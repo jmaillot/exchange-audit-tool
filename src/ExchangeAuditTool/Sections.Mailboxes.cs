@@ -218,6 +218,17 @@ namespace ExchangeAuditTool
             extra.Add(new AuditOption("regional", "Regional config (Language, TimeZone) - per-mailbox, slower", "regional", false).MarkSlow());
             section.AddGroup(extra);
 
+            var folderperms = new AuditOptionGroup("folderperms", "Folder permissions (per-mailbox, slower)", GroupMode.MultiCheck);
+            folderperms.Hint = "Get-MailboxFolderPermission on the chosen folder(s); non-default entries only.";
+            folderperms.Columns = 2;
+            folderperms.MarkSlow();
+            folderperms.Add(new AuditOption("calendar", "Calendar", "Calendar", false));
+            folderperms.Add(new AuditOption("inbox", "Inbox", "Inbox", false));
+            folderperms.Add(new AuditOption("sentitems", "Sent Items", "SentItems", false));
+            folderperms.Add(new AuditOption("contacts", "Contacts", "Contacts", false));
+            folderperms.Add(new AuditOption("tasks", "Tasks", "Tasks", false));
+            section.AddGroup(folderperms);
+
             PsScriptHelpers.AddSizeGroup(section);
 
             section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
@@ -291,6 +302,7 @@ namespace ExchangeAuditTool
                 bool regional = sel.IsSelected("complementary", "regional");
                 bool fa = sel.IsSelected("complementary", "fullaccess");
                 bool sa = sel.IsSelected("complementary", "sendas");
+                List<string> folders = sel.Selected("folderperms");
                 bool needSize = sel.IsSelected("complementary", "mailboxsize");
                 bool needCount = sel.IsSelected("complementary", "mailboxitemcount");
                 bool needArchive = sel.IsSelected("complementary", "archivesize");
@@ -357,7 +369,7 @@ namespace ExchangeAuditTool
                     sb.AppendLine();
                 }
 
-                if (!fa && !sa && !regional && !needUser && !needSize && !needCount && !needArchive)
+                if (!fa && !sa && !regional && !needUser && !needSize && !needCount && !needArchive && folders.Count == 0)
                 {
                     sb.AppendLine("$rows = $mbx | Select-Object " + selectList);
                 }
@@ -398,6 +410,17 @@ namespace ExchangeAuditTool
                         sb.AppendLine("    if ($rc) { $lang = $rc.Language; $tz = $rc.TimeZone }");
                         sb.AppendLine("    $obj | Add-Member -NotePropertyName Language -NotePropertyValue $lang -Force");
                         sb.AppendLine("    $obj | Add-Member -NotePropertyName TimeZone -NotePropertyValue $tz -Force");
+                    }
+                    foreach (string f in folders)
+                    {
+                        string colName = "FolderPerm_" + f;
+                        sb.AppendLine("    $fp = ''");
+                        sb.AppendLine("    try {");
+                        sb.AppendLine("        $fp = @(Get-MailboxFolderPermission -Identity ($m.PrimarySmtpAddress.ToString() + ':\\" + f + "') -ErrorAction Stop |");
+                        sb.AppendLine("            Where-Object { $_.User.DisplayName -ne 'Default' -and $_.User.DisplayName -ne 'Anonymous' } |");
+                        sb.AppendLine("            ForEach-Object { [string]$_.User.DisplayName + '=' + (($_.AccessRights) -join ',') }) -join ' | '");
+                        sb.AppendLine("    } catch { $fp = '' }");
+                        sb.AppendLine("    $obj | Add-Member -NotePropertyName " + colName + " -NotePropertyValue $fp -Force");
                     }
                     if (needSize)
                         sb.AppendLine("    $obj | Add-Member -NotePropertyName MailboxSizeMB -NotePropertyValue (Get-SizeMB $m.PrimarySmtpAddress) -Force");

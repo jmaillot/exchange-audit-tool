@@ -107,6 +107,9 @@ namespace ExchangeAuditTool
             folder.Columns = 2;
             folder.Add(new AuditOption("calendar", "Calendar", "Calendar", false));
             folder.Add(new AuditOption("inbox", "Inbox", "Inbox", false));
+            folder.Add(new AuditOption("sentitems", "Sent Items", "SentItems", false));
+            folder.Add(new AuditOption("contacts", "Contacts", "Contacts", false));
+            folder.Add(new AuditOption("tasks", "Tasks", "Tasks", false));
             section.AddGroup(folder);
 
             var extra = new AuditOptionGroup("complementary", "Complementary data", GroupMode.MultiCheck);
