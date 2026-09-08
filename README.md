@@ -2,118 +2,65 @@
 
 Modern WinForms GUI to run Exchange Online and on-premises audit exports.
 
-Clone:
-
-```bash
-git clone https://github.com/jmaillot/exchange-audit-tool.git
-cd exchange-audit-tool
-```
+Download the latest `ExchangeAuditTool_<version>.exe` from
+[GitHub Releases](https://github.com/jmaillot/exchange-audit-tool/releases) -
+no installation needed, just launch it.
 
 ## What it does
 
-Connects to Exchange (Online or on-premises), lets you tick the properties you need per object type, generates PowerShell on the fly, runs it in a persistent session, and exports `;`-delimited UTF-8 CSV files with a 200-row in-app preview.
+Connects to Exchange (Online or on-premises), lets you tick the properties you need per object type, runs the audit, and exports `;`-delimited UTF-8 CSV files (plus a formatted `.xlsx` workbook) with a 200-row in-app preview.
 
-Connection modes (`ExchangeConnection.cs`):
+Connection modes:
 
-- Exchange Online interactive (`Connect-ExchangeOnline`, optional UPN, `-DisableWAM` by default)
-- Exchange Online app-only (`-AppId -CertificateThumbprint -Organization`)
-- On-premises local (loads `RemoteExchange.ps1` / `Microsoft.Exchange.Management.PowerShell.E2010` snap-in, must run on an Exchange server)
-- On-premises remote (implicit remoting to `http(s)://<server>/PowerShell/`, Kerberos or Basic)
+- Exchange Online interactive (sign in with your account in the browser, optional UPN)
+- Exchange Online app-only (client ID + certificate + tenant, no interaction)
+- On-premises local (run the tool directly on an Exchange server)
+- On-premises remote (connects to `http(s)://<server>/PowerShell/`, Kerberos or Basic)
 
 ## Audit coverage (17 sections)
 
 | Area | Sections |
 |---|---|
-| User mailboxes | `mailbox-list` (UserMailbox, quotas, retention, archive, permissions, size via `Get-EXOMailboxStatistics`) |
-| Special mailboxes | `shared-mailboxes`, `room-mailboxes`, `equipment-mailboxes` (`Get-Mailbox`, `Get-CalendarProcessing`, `Get-Place`, `Get-MailboxFolderPermission`) |
-| Groups | `distribution-groups`, `security-groups`, `dynamic-groups`, `m365-groups` (`Get-DistributionGroup`, `Get-DynamicDistributionGroup`, `Get-UnifiedGroup` + `Get-UnifiedGroupLinks`) |
-| Contacts | `mail-users` (`Get-MailUser`), `mail-contacts` (`Get-MailContact` + `Get-Contact`) |
-| Domains / Routing | `transport-rules` (`Get-TransportRule`), `accepted-domains`, `remote-domains`, `connectors` (`Get-Inbound/OutboundConnector` online, `Get-Receive/SendConnector` on-prem) |
-| Public Folders | `pf-mailboxes` (`Get-Mailbox -PublicFolder`), `pf-hierarchy` (`Get-PublicFolder -Recurse` + client permissions), `mail-pf` (`Get-MailPublicFolder`) |
-
-Each section is a declarative `AuditSection` (`AuditModel.cs`): option groups rendered as checkboxes/radios, plus a `BuildScript(AuditSelection, ScriptContext)` delegate that emits the PowerShell pipeline. Scope-aware defaults (`DefOnline` / `DefOnPrem`) re-bias checkboxes after connect.
+| User mailboxes | User mailboxes (quotas, retention, archive, permissions, size) |
+| Special mailboxes | Shared, room and equipment mailboxes (delegates, calendar processing, folder permissions) |
+| Groups | Distribution, security, dynamic and Microsoft 365 groups (owners, members) |
+| Contacts | Mail users, mail contacts |
+| Domains / Routing | Transport rules, accepted domains, remote domains, connectors |
+| Public Folders | PF mailboxes, folder hierarchy (+ client permissions), mail-enabled public folders |
 
 ## Requirements
 
-- Windows with .NET Framework 4.x (`csc.exe` at `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe`)
-- `powershell.exe` available (used as a persistent child process)
-- For Exchange Online: `ExchangeOnlineManagement` module, any recent version (the app can install it from the Connection page via `Install-Module -Scope CurrentUser`)
-- Exchange permissions to run `Get-*` cmdlets (read-only audit, no writes except `Export-Csv`); e.g. View-Only Organization Management, or Recipient Management read access
+- Windows 10/11 with .NET Framework 4.8 (preinstalled on up-to-date Windows)
+- For Exchange Online: the `ExchangeOnlineManagement` module - the app can install it for you from the Connection page
+- An Exchange account with read rights to run `Get-*` commands (read-only audit; the only writes are the exported files), e.g. View-Only Organization Management
 
-## Build
-
-Prerequisites: [.NET SDK](https://dotnet.microsoft.com/download) (any recent version; the app targets `net48`) on Windows for a full build, or plain .NET Framework with `csc.exe` for the fallback path.
-
-```powershell
-.\Build-ExchangeAuditTool.ps1
-# optional: .\Build-ExchangeAuditTool.ps1 -OutputDirectory .\dist -Configuration Release
-```
-
-This runs `dotnet publish` on `src/ExchangeAuditTool` (falls back to direct `csc` if no SDK is present).
-Developers can also work with the solution directly:
-
-```powershell
-dotnet build ExchangeAuditTool.sln -c Release
-dotnet test ExchangeAuditTool.sln -c Release
-```
-
-Output: `dist/ExchangeAuditTool_<version>.exe` (version taken from `AssemblyFileVersion` in `src/ExchangeAuditTool/Program.cs`). `dist/` is git-ignored.
-
-## Release
-
-1. Bump `AssemblyFileVersion` (and `AssemblyVersion`) in `src/ExchangeAuditTool/Program.cs`.
-2. Commit the version bump.
-3. Tag: `git tag vX.Y.Z`, then `git push origin vX.Y.Z`.
-4. The `Release` workflow builds the exe, writes SHA256 checksums (`dist/*.sha256`), warns (non-failing) if the tag does not match `AssemblyFileVersion`, and attaches `dist/*.exe` + `dist/*.sha256` to the GitHub release.
-
-## Excel import (`;`-delimited UTF-8 CSV)
-
-1. Excel > Data > From Text/CSV, select the exported CSV.
-2. Set File Origin to `65001: Unicode (UTF-8)` and Delimiter to `Semicolon`.
-3. Load. Multi-value cells are `,`-joined inside the `;`-delimited file.
-
-Tip: leave the `XLSX` box checked and you can skip this entirely - the workbook opens directly.
-
-## Run / Use
+## User guide
 
 1. Launch `ExchangeAuditTool_<version>.exe`.
-2. Connection page: pick a mode, fill UPN / AppId / server fields, `Connect`. Status is verified with `Get-ConnectionInformation` / `Get-OrganizationConfig`.
-3. Pick a section in the sidebar (e.g. User mailboxes), tick properties, set Output CSV (default `%USERPROFILE%\Documents\ExchangeAudit\`), `RUN AUDIT`. Prompt-free modes (app-only, local, Kerberos) run up to 3 sections in parallel (extras queue); modes that can prompt (interactive sign-in, Basic/credential dialog) run audits on the connected session one at a time, so you sign in once at Connect and never again. Each run has its own Cancel and live progress in its Results header.
-4. Watch the Activity Log (also written to `ExchangeAuditTool.activity.log`). On success the CSV is written by PowerShell (`Export-Csv -Delimiter ';'`) and previewed in the grid. `Open CSV` opens it with the default handler. With the `XLSX` box checked (default), a formatted `.xlsx` workbook (bold header, autofilter, frozen top row) is saved next to the CSV - no Excel import wizard needed.
+2. Connection page: pick a mode, fill the fields, `Connect`. The footer confirms who you are connected as.
+3. Pick a section in the sidebar (e.g. User mailboxes), tick the properties you need (use `Filter` to find them, `Select all` to toggle), set the Output CSV (default `%USERPROFILE%\Documents\ExchangeAudit\`), `RUN AUDIT`. Each run has its own Cancel and live progress in its Results header.
+4. On success the CSV is previewed in the grid (first 200 rows). `Open CSV` opens the file, `Folder` opens its location. With the `XLSX` box checked (default), a formatted workbook (bold header, filter, frozen top row) is saved next to the CSV and the `XLSX` button opens it.
 
 Notes:
 
-- Every audit script is prepended with `ConnectionSettings.BuildPrelude()` so session reuse / reconnect is automatic.
-- Multi-value cells are `,`-joined inside a `;`-delimited file to avoid clashes (`AuditModel.cs:102`).
-- Timeouts: connect 5 min, audit up to 30 min. Temp scripts (`%TEMP%\ExAudit-*.ps1`) are deleted after each call.
-- Logs: startup errors → `<exe_dir>\ExchangeAuditTool.startup.log`; runtime → `%USERPROFILE%\Documents\ExchangeAudit\ExchangeAuditTool.activity.log`.
+- Your audit files land in `%USERPROFILE%\Documents\ExchangeAudit\` by default.
+- Timeouts: connect 5 min, audit up to 30 min.
+- The Activity Log at the bottom shows everything the tool does; it is also saved to `%USERPROFILE%\Documents\ExchangeAudit\ExchangeAuditTool.activity.log`.
+- Multi-value cells are `,`-joined inside the `;`-delimited file, so Excel splits columns correctly.
 
-## Project structure
+## Excel import (only needed for the raw CSV)
 
-```
-ExchangeAuditTool.sln
-src/ExchangeAuditTool/      → App (net48 WinForms)
-tests/ExchangeAuditTool.Tests/ → xUnit tests for pure logic
-docs/                        → Additional documentation
-```
+If you unchecked `XLSX`, import the `;`-delimited UTF-8 CSV manually:
 
-| File | Purpose |
-|---|---|
-| `src/ExchangeAuditTool/Program.cs` | Entry point + `MainForm` shell (title bar, sidebar nav, workspace, log card) |
-| `src/ExchangeAuditTool/SectionPages.cs` | Connection page, per-section pages, `RunSectionAsync`, CSV preview |
-| `src/ExchangeAuditTool/AuditModel.cs` | `AuditSection` / `AuditOptionGroup` / `AuditSelection` / `ScriptContext` DSL + `AuditRegistry.BuildAll()` |
-| `src/ExchangeAuditTool/ExchangeConnection.cs` | `ConnectionMode`, `ConnectionSettings`, prelude / disconnect / status script builders |
-| `src/ExchangeAuditTool/PowerShellSession.cs` | Persistent `powershell.exe` host, `Execute(script, timeout, onLine)` |
-| `src/ExchangeAuditTool/PsScriptHelpers.cs` | Shared PS emitters (`Resolve-Recip`, `Get-SizeMB`), size group, collector |
-| `src/ExchangeAuditTool/Sections.Mailboxes.cs` | User mailbox export |
-| `src/ExchangeAuditTool/Sections.MailboxTypes.cs` | Shared / Room / Equipment mailboxes |
-| `src/ExchangeAuditTool/Sections.Groups.cs` | Distribution / Security / Dynamic / M365 groups |
-| `src/ExchangeAuditTool/Sections.Contacts.cs` | Mail users / Mail contacts |
-| `src/ExchangeAuditTool/Sections.DomainsRouting.cs` | Transport rules / Accepted / Remote domains / Connectors |
-| `src/ExchangeAuditTool/Sections.PublicFolders.cs` | PF mailboxes / hierarchy / mail-enabled PF |
-| `src/ExchangeAuditTool/Theme.cs`, `BrandAssets.cs` | Dark theme, `RoundedPanel` / `ModernButton`, vector icons, logo |
-| `src/ExchangeAuditTool/app.manifest`, `app.ico` | `asInvoker`, PerMonitorV2 DPI, Win10/11 support; app icon |
-| `Build-ExchangeAuditTool.ps1` | Build script (`dotnet publish`, `csc` fallback) |
+1. Excel > Data > From Text/CSV, select the exported CSV.
+2. Set File Origin to `65001: Unicode (UTF-8)` and Delimiter to `Semicolon`.
+3. Load.
+
+Tip: leave the `XLSX` box checked and you can skip this entirely - the workbook opens directly.
+
+## For developers
+
+See [BUILD.md](BUILD.md) for building from source, project structure and the release process.
 
 ## License
 

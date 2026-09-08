@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+### Changed
+
+- README refocused as a user guide; developer build/release/structure docs moved to BUILD.md
+
 ## [1.4.0] - 2026-09-08
 
 ### Added
