@@ -9,6 +9,7 @@ All notable changes to this project are documented here. Format follows Keep a C
 - `mobile-devices` section: per-mailbox partnerships (type, model, OS, access state, sync times) for wipe/re-enroll planning, in its own Mobile category
 - Item counts + archive size on user, shared, room and equipment mailboxes (item count also on PF mailboxes)
 - Send-connector `TlsCertificateName`
+- Receive-connector `TlsCertificateName`; removed dead script-runner helper
 - Folder permissions on user mailboxes; Sent Items, Contacts and Tasks folders on shared mailboxes (all opt-in, slowest lookup)
 - `protection-policies` section (new Protection category, online-only): anti-spam inbound/outbound, anti-malware, anti-phishing and DLP policies plus their rules, one object per run
 

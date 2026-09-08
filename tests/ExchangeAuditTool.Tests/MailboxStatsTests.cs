@@ -129,6 +129,13 @@ namespace ExchangeAuditTool.Tests
                 string script = section.BuildScript(sel, ctx);
                 Assert.Contains("Get-SendConnector", script);
                 Assert.Contains("TlsCertificateName", script);
+
+                var selIn = new AuditSelection();
+                selIn.Set("direction", new List<string>(new string[] { "inbound" }));
+                selIn.Set("opin", new List<string>(new string[] { "TlsCertificateName" }));
+                string scriptIn = section.BuildScript(selIn, ctx);
+                Assert.Contains("Get-ReceiveConnector", scriptIn);
+                Assert.Contains("TlsCertificateName", scriptIn);
             }
             finally
             {

@@ -1216,11 +1216,6 @@ namespace ExchangeAuditTool
             return Task.Run(delegate { return _ps.Execute(script, timeoutMs, live); });
         }
 
-        private Task<PsResult> RunPowerShellScriptAsync(string script)
-        {
-            return RunPowerShellStreamingAsync(script, 1800000);
-        }
-
         private void CloseSession()
         {
             try

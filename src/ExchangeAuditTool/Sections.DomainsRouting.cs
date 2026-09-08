@@ -389,6 +389,7 @@ namespace ExchangeAuditTool
             opIn.AddProp("AuthMechanism", false);
             opIn.AddProp("PermissionGroups", false);
             opIn.AddProp("TransportRole", false);
+            opIn.AddProp("TlsCertificateName", false);
             opIn.AddProp("MaxMessageSize", false);
             section.AddGroup(opIn);
 
