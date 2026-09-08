@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-09-08
+
 ### Added
 
 - `journal-rules`, `retention-policies`, `address-books` (on-prem), `certificates` (on-prem), `owa-policy`, `role-policies` sections (Organization category)
