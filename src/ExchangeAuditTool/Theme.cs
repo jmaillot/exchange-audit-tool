@@ -11,20 +11,120 @@ namespace ExchangeAuditTool
 {
     internal static class UiTheme
     {
-        public static readonly Color Window = Color.FromArgb(7, 16, 28);
-        public static readonly Color Sidebar = Color.FromArgb(9, 20, 34);
-        public static readonly Color Surface = Color.FromArgb(12, 25, 41);
-        public static readonly Color Surface2 = Color.FromArgb(19, 39, 63);
-        public static readonly Color Border = Color.FromArgb(29, 48, 69);
-        public static readonly Color Blue = Color.FromArgb(47, 111, 235);
-        public static readonly Color BlueHover = Color.FromArgb(60, 125, 246);
-        public static readonly Color Text = Color.FromArgb(230, 235, 243);
-        public static readonly Color Muted = Color.FromArgb(139, 153, 171);
-        public static readonly Color NavText = Color.FromArgb(203, 215, 230);
-        public static readonly Color Green = Color.FromArgb(49, 211, 94);
-        public static readonly Color Orange = Color.FromArgb(250, 173, 65);
-        public static readonly Color Red = Color.FromArgb(248, 113, 113);
-        public static readonly Color FieldBack = Color.FromArgb(7, 16, 28);
+        public static bool IsLight { get; private set; }
+
+        public static Color Window { get; private set; }
+        public static Color Sidebar { get; private set; }
+        public static Color Surface { get; private set; }
+        public static Color Surface2 { get; private set; }
+        public static Color Border { get; private set; }
+        public static Color Blue { get; private set; }
+        public static Color BlueHover { get; private set; }
+        public static Color Text { get; private set; }
+        public static Color Muted { get; private set; }
+        public static Color NavText { get; private set; }
+        public static Color SideMuted { get; private set; }
+        public static Color Green { get; private set; }
+        public static Color Orange { get; private set; }
+        public static Color Red { get; private set; }
+        public static Color FieldBack { get; private set; }
+        public static Color TitleBar { get; private set; }
+        public static Color ButtonHover { get; private set; }
+        public static Color GridBack { get; private set; }
+        public static Color GridRowBack { get; private set; }
+        public static Color DisabledBack { get; private set; }
+        public static Color DisabledBorder { get; private set; }
+
+        static UiTheme() { ApplyPalette(false); }
+
+        public static void SetLight(bool light)
+        {
+            ApplyPalette(light);
+        }
+
+        // Index-aligned token lists: 0 Window, 1 Surface, 2 Surface2,
+        // 3 Border, 4 Text, 5 Muted, 6 Green, 7 Orange, 8 Red, 9 FieldBack,
+        // 10 ButtonHover, 11 GridBack, 12 GridRowBack, 13 DisabledBack,
+        // 14 DisabledBorder.
+        private static readonly Color[] DarkPalette = new Color[]
+        {
+            Color.FromArgb(7, 16, 28),
+            Color.FromArgb(12, 25, 41),
+            Color.FromArgb(19, 39, 63),
+            Color.FromArgb(29, 48, 69),
+            Color.FromArgb(230, 235, 243),
+            Color.FromArgb(139, 153, 171),
+            Color.FromArgb(49, 211, 94),
+            Color.FromArgb(250, 173, 65),
+            Color.FromArgb(248, 113, 113),
+            Color.FromArgb(7, 16, 28),
+            Color.FromArgb(22, 42, 65),
+            Color.FromArgb(6, 15, 26),
+            Color.FromArgb(8, 18, 30),
+            Color.FromArgb(28, 42, 60),
+            Color.FromArgb(35, 55, 78)
+        };
+
+        private static readonly Color[] LightPalette = new Color[]
+        {
+            Color.FromArgb(241, 244, 249),
+            Color.FromArgb(255, 255, 255),
+            Color.FromArgb(232, 238, 246),
+            Color.FromArgb(196, 207, 226),
+            Color.FromArgb(27, 37, 54),
+            Color.FromArgb(92, 107, 132),
+            Color.FromArgb(30, 142, 77),
+            Color.FromArgb(178, 106, 0),
+            Color.FromArgb(192, 57, 43),
+            Color.FromArgb(255, 255, 255),
+            Color.FromArgb(215, 226, 244),
+            Color.FromArgb(255, 255, 255),
+            Color.FromArgb(255, 255, 255),
+            Color.FromArgb(226, 232, 242),
+            Color.FromArgb(196, 207, 226)
+        };
+
+        private static void ApplyPalette(bool light)
+        {
+            IsLight = light;
+            // Chrome (title bar, sidebar) stays dark in both themes.
+            Sidebar = Color.FromArgb(9, 20, 34);
+            NavText = Color.FromArgb(203, 215, 230);
+            SideMuted = Color.FromArgb(139, 153, 171);
+            TitleBar = Color.FromArgb(8, 18, 30);
+            Blue = Color.FromArgb(47, 111, 235);
+            BlueHover = Color.FromArgb(60, 125, 246);
+            Color[] p = light ? LightPalette : DarkPalette;
+            Window = p[0];
+            Surface = p[1];
+            Surface2 = p[2];
+            Border = p[3];
+            Text = p[4];
+            Muted = p[5];
+            Green = p[6];
+            Orange = p[7];
+            Red = p[8];
+            FieldBack = p[9];
+            ButtonHover = p[10];
+            GridBack = p[11];
+            GridRowBack = p[12];
+            DisabledBack = p[13];
+            DisabledBorder = p[14];
+        }
+
+        // Old-value -> new-value map for the live re-skin walk. Tokens that
+        // are identical in both palettes (dark chrome) are omitted on purpose,
+        // so the title bar, sidebar and nav are never touched.
+        public static Dictionary<Color, Color> ThemeMap(bool toLight)
+        {
+            Color[] from = toLight ? DarkPalette : LightPalette;
+            Color[] to = toLight ? LightPalette : DarkPalette;
+            var map = new Dictionary<Color, Color>();
+            for (int i = 0; i < from.Length; i++)
+                if (from[i].ToArgb() != to[i].ToArgb() && !map.ContainsKey(from[i]))
+                    map.Add(from[i], to[i]);
+            return map;
+        }
     }
 
     internal class RoundedPanel : Panel
@@ -102,7 +202,7 @@ namespace ExchangeAuditTool
         {
             CornerRadius = 6;
             NormalColor = UiTheme.Surface2;
-            HoverColor = Color.FromArgb(22, 42, 65);
+            HoverColor = UiTheme.ButtonHover;
             BorderColor = UiTheme.Border;
             FlatStyle = FlatStyle.Flat;
             FlatAppearance.BorderSize = 0;
@@ -150,9 +250,9 @@ namespace ExchangeAuditTool
             Color border = Active ? Color.FromArgb(92, 151, 255) : BorderColor;
             if (!Enabled)
             {
-                bg = Color.FromArgb(28, 42, 60);
+                bg = UiTheme.DisabledBack;
                 fg = UiTheme.Muted;
-                border = Color.FromArgb(35, 55, 78);
+                border = UiTheme.DisabledBorder;
             }
             using (GraphicsPath path = RoundedPanel.BuildRoundRect(rect, radius))
             using (SolidBrush brush = new SolidBrush(bg))

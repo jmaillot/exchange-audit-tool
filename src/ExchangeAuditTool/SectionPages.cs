@@ -397,7 +397,7 @@ namespace ExchangeAuditTool
 
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(0, 8, 0, 0) };
             var save = new ModernButton { Text = "Connect", Width = 160, Height = 36, Margin = new Padding(0, 0, 8, 8) };
-            save.NormalColor = UiTheme.Blue; save.BackColor = UiTheme.Blue; save.ForeColor = Color.White;
+            save.NormalColor = UiTheme.Blue; save.BackColor = UiTheme.Blue; save.HoverColor = UiTheme.BlueHover; save.ForeColor = Color.White;
             var installMod = new ModernButton { Text = "Install EXO module", Width = 170, Height = 36, Margin = new Padding(0, 0, 8, 8) };
             var disconnectBtn = new ModernButton { Text = "Disconnect", Width = 120, Height = 36, Margin = new Padding(0, 0, 8, 8) };
             _connStatus = new Label { Text = ConnectionSettings.Summary(), AutoSize = true, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F), Margin = new Padding(8, 10, 0, 8) };
@@ -791,7 +791,7 @@ namespace ExchangeAuditTool
             outputRow.Dock = DockStyle.Bottom;
 
             ui.RunButton = new ModernButton { Text = "RUN AUDIT", Dock = DockStyle.Fill, Height = 42, Enabled = false };
-            ui.RunButton.NormalColor = UiTheme.Blue; ui.RunButton.BackColor = UiTheme.Blue; ui.RunButton.ForeColor = Color.White;
+            ui.RunButton.NormalColor = UiTheme.Blue; ui.RunButton.BackColor = UiTheme.Blue; ui.RunButton.HoverColor = UiTheme.BlueHover; ui.RunButton.ForeColor = Color.White;
             ui.RunButton.Click += async delegate { await RunSectionAsync(ui); };
             _optionTip.SetToolTip(ui.RunButton, "Connect to Exchange first");
             ui.CancelButton = new ModernButton { Text = "Cancel", Dock = DockStyle.Right, Width = 110, Height = 42, Enabled = false };
@@ -848,7 +848,7 @@ namespace ExchangeAuditTool
             ui.Grid = new DataGridView
             {
                 Dock = DockStyle.Fill,
-                BackgroundColor = Color.FromArgb(6, 15, 26),
+                BackgroundColor = UiTheme.GridBack,
                 BorderStyle = BorderStyle.None,
                 ReadOnly = true,
                 AllowUserToAddRows = false,
@@ -860,11 +860,8 @@ namespace ExchangeAuditTool
                 AllowUserToOrderColumns = true,
                 ClipboardCopyMode = DataGridViewClipboardCopyMode.EnableAlwaysIncludeHeaderText
             };
-            ui.Grid.ColumnHeadersDefaultCellStyle.BackColor = UiTheme.Surface2;
-            ui.Grid.ColumnHeadersDefaultCellStyle.ForeColor = UiTheme.Text;
-            ui.Grid.DefaultCellStyle.BackColor = Color.FromArgb(8, 18, 30);
-            ui.Grid.DefaultCellStyle.ForeColor = UiTheme.Text;
-            ui.Grid.DefaultCellStyle.SelectionBackColor = UiTheme.Blue;
+            StyleGrid(ui.Grid);
+            StyleGrid(ui.Grid);
             ui.Grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             // Reveal full cell content (long SMTP addresses, permission lists, etc.) on hover.
             ui.Grid.ShowCellToolTips = true;
@@ -872,7 +869,7 @@ namespace ExchangeAuditTool
             resultsCard.Controls.Add(ui.Grid);
             resultsCard.Controls.Add(ui.ResultInfo);
             resultsCard.Controls.Add(rHead);
-            ui.EmptyState = new Label { Text = "No results yet." + Environment.NewLine + "Pick options and press RUN AUDIT.", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 10F), BackColor = Color.FromArgb(6, 15, 26), Cursor = Cursors.Hand };
+            ui.EmptyState = new Label { Text = "No results yet." + Environment.NewLine + "Pick options and press RUN AUDIT.", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 10F), BackColor = UiTheme.GridBack, Cursor = Cursors.Hand };
             ui.EmptyState.Click += delegate { if (ui.RunButton.Enabled) ui.RunButton.Focus(); };
             _optionTip.SetToolTip(ui.EmptyState, "Pick options on the left, then press RUN AUDIT" + Environment.NewLine + "Click to focus the Run button.");
             resultsCard.Controls.Add(ui.EmptyState);
@@ -1238,6 +1235,20 @@ namespace ExchangeAuditTool
                 try { ps.Dispose(); }
                 catch { }
             }
+        }
+
+        private static void StyleGrid(DataGridView grid)
+        {
+            grid.BackgroundColor = UiTheme.GridBack;
+            grid.GridColor = UiTheme.Border;
+            grid.ColumnHeadersDefaultCellStyle.BackColor = UiTheme.Surface2;
+            grid.ColumnHeadersDefaultCellStyle.ForeColor = UiTheme.Text;
+            grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = UiTheme.Surface2;
+            grid.ColumnHeadersDefaultCellStyle.SelectionForeColor = UiTheme.Text;
+            grid.DefaultCellStyle.BackColor = UiTheme.GridRowBack;
+            grid.DefaultCellStyle.ForeColor = UiTheme.Text;
+            grid.DefaultCellStyle.SelectionBackColor = UiTheme.Blue;
+            grid.DefaultCellStyle.SelectionForeColor = Color.White;
         }
 
         private int LoadCsvIntoGrid(DataGridView grid, string path, int maxRows)

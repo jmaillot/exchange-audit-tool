@@ -10,8 +10,8 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyProduct("Exchange Audit Tool")]
 [assembly: System.Reflection.AssemblyDescription("Modern GUI to run Exchange Online and on-premises audit exports.")]
 [assembly: System.Reflection.AssemblyCompany("Prodware")]
-[assembly: System.Reflection.AssemblyVersion("1.5.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.5.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.6.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.6.0.0")]
 
 namespace ExchangeAuditTool
 {
@@ -117,6 +117,7 @@ namespace ExchangeAuditTool
         private void InitializeShell()
         {
             InitLogFile();
+            UiTheme.SetLight(LoadThemeSetting());
             SuspendLayout();
             Text = "Exchange Audit Tool";
             StartPosition = FormStartPosition.Manual;
@@ -157,7 +158,7 @@ namespace ExchangeAuditTool
 
         private Panel BuildTitleBar()
         {
-            var bar = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = Color.FromArgb(8, 18, 30) };
+            var bar = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = UiTheme.TitleBar };
             bar.MouseDown += DragWindow;
 
             var icon = new PictureBox
@@ -166,7 +167,7 @@ namespace ExchangeAuditTool
                 SizeMode = PictureBoxSizeMode.Zoom,
                 Location = new Point(10, 5),
                 Size = new Size(24, 24),
-                BackColor = bar.BackColor
+                BackColor = UiTheme.TitleBar
             };
             icon.MouseDown += DragWindow;
 
@@ -209,7 +210,7 @@ namespace ExchangeAuditTool
             {
                 Width = 46,
                 FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(8, 18, 30),
+                BackColor = UiTheme.TitleBar,
                 Image = UiAssets.Render(glyph, 14),
                 ImageAlign = ContentAlignment.MiddleCenter,
                 TabStop = false,
@@ -358,12 +359,21 @@ namespace ExchangeAuditTool
             footerStatus.Font = new Font("Segoe UI", 8.5F);
             footerStatus.TextAlign = ContentAlignment.MiddleLeft;
 
-            var version = new Label { Text = "v" + Application.ProductVersion, Dock = DockStyle.Bottom, Height = 20, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F), TextAlign = ContentAlignment.MiddleLeft };
+            var bottomRow = new Panel { Dock = DockStyle.Bottom, Height = 34, BackColor = UiTheme.Sidebar };
+            var version = new Label { Text = "v" + Application.ProductVersion, Dock = DockStyle.Fill, ForeColor = UiTheme.SideMuted, Font = new Font("Segoe UI", 8.5F), TextAlign = ContentAlignment.MiddleLeft, BackColor = UiTheme.Sidebar };
+            var themeBtn = new ModernButton { Text = "◐", Dock = DockStyle.Right, Width = 44, Height = 30, Padding = new Padding(0) };
+            themeBtn.Font = new Font("Segoe UI Symbol", 11F);
+            themeBtn.AccessibleName = "Switch theme";
+            themeBtn.AccessibleDescription = "Switch between the dark and light theme";
+            _optionTip.SetToolTip(themeBtn, "Switch between the dark and light theme");
             _optionTip.SetToolTip(version, "Credits: Jérémy MAILLOT - jmaillot@prodware.fr");
+            themeBtn.Click += delegate { ApplyTheme(!UiTheme.IsLight); };
+            bottomRow.Controls.Add(version);
+            bottomRow.Controls.Add(themeBtn);
 
             sidebar.Controls.Add(navHost);
             sidebar.Controls.Add(brand);
-            sidebar.Controls.Add(version);
+            sidebar.Controls.Add(bottomRow);
             sidebar.Controls.Add(footerStatus);
             return sidebar;
         }
@@ -610,6 +620,84 @@ namespace ExchangeAuditTool
             progress.Visible = busy;
             progress.Style = ProgressBarStyle.Marquee;
             UseWaitCursor = busy;
+        }
+
+        // Live theme switch: content tokens are remapped across the whole
+        // control tree (dark chrome is untouched by design - its tokens are
+        // identical in both palettes), grids are re-styled explicitly, and the
+        // activity log deliberately stays a dark console.
+        private void ApplyTheme(bool light)
+        {
+            Dictionary<Color, Color> map = UiTheme.ThemeMap(light);
+            UiTheme.SetLight(light);
+            RemapTree(this, map);
+            foreach (var kv in _sectionUi)
+            {
+                if (kv.Value.Grid != null) StyleGrid(kv.Value.Grid);
+                if (kv.Value.EmptyState != null) kv.Value.EmptyState.BackColor = UiTheme.GridBack;
+            }
+            SaveThemeSetting(light);
+        }
+
+        private void RemapTree(Control c, Dictionary<Color, Color> map)
+        {
+            if (c == logBox) return;
+            RemapControl(c, map);
+            foreach (Control child in c.Controls) RemapTree(child, map);
+        }
+
+        private static void RemapControl(Control c, Dictionary<Color, Color> map)
+        {
+            Color n;
+            if (map.TryGetValue(c.BackColor, out n)) c.BackColor = n;
+            if (map.TryGetValue(c.ForeColor, out n)) c.ForeColor = n;
+            ModernButton mb = c as ModernButton;
+            if (mb != null)
+            {
+                if (map.TryGetValue(mb.NormalColor, out n)) mb.NormalColor = n;
+                if (map.TryGetValue(mb.HoverColor, out n)) mb.HoverColor = n;
+                if (map.TryGetValue(mb.BorderColor, out n)) mb.BorderColor = n;
+                mb.Invalidate();
+            }
+            Button b = c as Button;
+            if (b != null && !(b is ModernButton))
+            {
+                if (map.TryGetValue(b.FlatAppearance.MouseOverBackColor, out n)) b.FlatAppearance.MouseOverBackColor = n;
+                if (map.TryGetValue(b.FlatAppearance.MouseDownBackColor, out n)) b.FlatAppearance.MouseDownBackColor = n;
+            }
+        }
+
+        private static string ThemeSettingsPath()
+        {
+            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "ExchangeAudit");
+            try { Directory.CreateDirectory(dir); } catch { }
+            return Path.Combine(dir, "settings.json");
+        }
+
+        private static bool LoadThemeSetting()
+        {
+            try
+            {
+                string text = File.ReadAllText(ThemeSettingsPath(), Encoding.UTF8);
+                Dictionary<string, string> map = MiniJson.ParseObject(text);
+                string theme;
+                if (map.TryGetValue("theme", out theme)) return theme == "light";
+            }
+            catch { }
+            return false;
+        }
+
+        private static void SaveThemeSetting(bool light)
+        {
+            try
+            {
+                var sb = new StringBuilder();
+                sb.Append("{\"theme\":");
+                MiniJson.AppendString(sb, light ? "light" : "dark");
+                sb.Append('}');
+                File.WriteAllText(ThemeSettingsPath(), sb.ToString(), new UTF8Encoding(false));
+            }
+            catch { }
         }
     }
 }
