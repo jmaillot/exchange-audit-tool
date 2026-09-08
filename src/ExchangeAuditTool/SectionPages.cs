@@ -127,6 +127,11 @@ namespace ExchangeAuditTool
         private readonly SemaphoreSlim _runSlots = new SemaphoreSlim(MaxParallelAudits, MaxParallelAudits);
         private int _runningAudits;
 
+        // Worker sign-in is serialized: the first worker prompts (browser /
+        // credential dialog) and follow-ups reuse the cached token, so parallel
+        // audits cost a single sign-in instead of one per session.
+        private readonly SemaphoreSlim _connectGate = new SemaphoreSlim(1, 1);
+
         private Control BuildConnectionPage()
         {
             var page = new Panel { BackColor = UiTheme.Window, Padding = new Padding(0, 0, 0, 10), AutoScroll = true };
@@ -834,7 +839,7 @@ namespace ExchangeAuditTool
             try { body = section.BuildScript(selection, new ScriptContext(csv)); }
             catch (Exception ex) { Warn("Could not build the script: " + ex.Message); return; }
 
-            string full = ConnectionSettings.BuildPrelude() + Environment.NewLine + body;
+            string prelude = ConnectionSettings.BuildPrelude();
 
             if (ui.Ps == null) ui.Ps = new PowerShellSession();
             PowerShellSession session = ui.Ps;
@@ -887,7 +892,21 @@ namespace ExchangeAuditTool
 
                     var result = await Task.Run(delegate
                     {
-                        return session.Execute(full, 1800000, delegate (string line)
+                        PsResult cr;
+                        try { _connectGate.Wait(cts.Token); }
+                        catch (OperationCanceledException) { return new PsResult(-1, "[cancelled by user]"); }
+                        try
+                        {
+                            AppendLog("Establishing dedicated session for " + section.NavTitle + " (sign in once - follow-ups reuse it)...");
+                            cr = session.Execute(prelude + Environment.NewLine + "Write-Host 'Worker session ready.'", 300000, delegate (string line)
+                            {
+                                Interlocked.Increment(ref streamedLines);
+                                AppendLog(line);
+                            });
+                        }
+                        finally { try { _connectGate.Release(); } catch { } }
+                        if (cr.ExitCode != 0) return cr;
+                        return session.Execute(body, 1800000, delegate (string line)
                         {
                             Interlocked.Increment(ref streamedLines);
                             AppendLog(line);
