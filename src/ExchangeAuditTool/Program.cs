@@ -359,21 +359,11 @@ namespace ExchangeAuditTool
             footerStatus.TextAlign = ContentAlignment.MiddleLeft;
 
             var version = new Label { Text = "v" + Application.ProductVersion, Dock = DockStyle.Bottom, Height = 20, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.5F), TextAlign = ContentAlignment.MiddleLeft };
-
-            var credits = new Label
-            {
-                Text = "Credits: Jérémy MAILLOT\njmaillot@prodware.fr",
-                Dock = DockStyle.Bottom,
-                Height = 36,
-                ForeColor = UiTheme.Muted,
-                Font = new Font("Segoe UI", 8.5F),
-                TextAlign = ContentAlignment.MiddleLeft
-            };
+            _optionTip.SetToolTip(version, "Credits: Jérémy MAILLOT - jmaillot@prodware.fr");
 
             sidebar.Controls.Add(navHost);
             sidebar.Controls.Add(brand);
             sidebar.Controls.Add(version);
-            sidebar.Controls.Add(credits);
             sidebar.Controls.Add(footerStatus);
             return sidebar;
         }

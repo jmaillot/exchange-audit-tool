@@ -4,6 +4,25 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- Select-all now toggles only filter-matching options while a filter is typed
+- xUnit coverage for connection/CSV validators (`IsValidUpn/Thumbprint/Hostname/CsvPath`)
+
+### Fixed
+
+- Scope badge truncates with ellipsis + tooltip instead of clipping
+- Group hints wrap to full text at 8.5pt instead of single-line clipping at 7.8pt
+- Minimum info-text size raised to 8.5pt (section subtitles, field notes, slow hint, results)
+- EXO module check failure shows "check failed - retry" in place instead of surfacing through the crash log
+
+### Changed
+
+- Card corner radius unified to 8 (window 9 > cards 8 > groups/buttons 6)
+- `Surface2` lightened for visible card-in-card separation
+- Sidebar credits folded into the version tooltip, freeing nav space
+- EXO module check failure shows "check failed - retry" in place instead of surfacing through the crash log
+
 ## [1.2.1] - 2026-09-08
 
 ### Added
