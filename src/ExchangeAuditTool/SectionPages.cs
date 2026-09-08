@@ -91,10 +91,10 @@ namespace ExchangeAuditTool
             modeGroup.Controls.Add(rInteractive); modeGroup.Controls.Add(rApp);
             modeGroup.Controls.Add(rLocal); modeGroup.Controls.Add(rRemote);
 
-            var moduleRow = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = UiTheme.Surface };
+            var moduleRow = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = UiTheme.Surface };
             var moduleLabel = new Label { Text = "EXO module:", Dock = DockStyle.Left, Width = 90, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
             _exoModuleStatus = new Label { Text = "checking...", Dock = DockStyle.Left, Width = 300, ForeColor = UiTheme.Orange, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 8.8F) };
-            var checkBtn = new ModernButton { Text = "Re-check", Dock = DockStyle.Right, Width = 96, Height = 26, Padding = new Padding(0) };
+            var checkBtn = new ModernButton { Text = "Re-check", Dock = DockStyle.Right, Width = 96, Height = 32, Padding = new Padding(0) };
             checkBtn.Click += delegate { CheckExoModuleAsync(); };
             moduleRow.Controls.Add(_exoModuleStatus);
             moduleRow.Controls.Add(moduleLabel);
@@ -433,11 +433,11 @@ namespace ExchangeAuditTool
             slowHint.Visible = HasSlowOptions(ui);
 
             var resultsCard = new RoundedPanel { Dock = DockStyle.Fill, BackColor = UiTheme.Surface, CornerRadius = 7, Padding = new Padding(12, 10, 12, 12) };
-            var rHead = new Panel { Dock = DockStyle.Top, Height = 30, BackColor = UiTheme.Surface };
+            var rHead = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = UiTheme.Surface };
             var rTitle = new Label { Text = "Results preview", Dock = DockStyle.Left, Width = 160, ForeColor = UiTheme.Text, Font = new Font("Segoe UI Semibold", 9.5F), TextAlign = ContentAlignment.MiddleLeft };
-            ui.OpenButton = new ModernButton { Text = "Open CSV", Dock = DockStyle.Right, Width = 96, Height = 26, Padding = new Padding(0), Enabled = false };
+            ui.OpenButton = new ModernButton { Text = "Open CSV", Dock = DockStyle.Right, Width = 96, Height = 32, Padding = new Padding(0), Enabled = false };
             ui.OpenButton.Click += delegate { if (!string.IsNullOrEmpty(ui.LastCsv) && File.Exists(ui.LastCsv)) OpenPath(ui.LastCsv); };
-            var folderBtn = new ModernButton { Text = "Folder", Dock = DockStyle.Right, Width = 70, Height = 26, Padding = new Padding(0) };
+            var folderBtn = new ModernButton { Text = "Folder", Dock = DockStyle.Right, Width = 70, Height = 32, Padding = new Padding(0) };
             folderBtn.Click += delegate
             {
                 if (string.IsNullOrEmpty(ui.LastCsv)) return;

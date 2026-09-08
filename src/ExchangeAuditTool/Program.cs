@@ -379,7 +379,7 @@ namespace ExchangeAuditTool
         {
             var btn = new Button
             {
-                Size = new Size(230, 28),
+                Size = new Size(230, 32),
                 FlatStyle = FlatStyle.Flat,
                 TextAlign = ContentAlignment.MiddleLeft,
                 ForeColor = Color.FromArgb(66, 138, 247),
@@ -420,7 +420,7 @@ namespace ExchangeAuditTool
                     cat.Header.Location = new Point(4, y);
                     cat.Header.Text = CategoryHeaderText(cat);
                 }
-                y += 30;
+                y += 34;
 
                 foreach (Button b in cat.Buttons)
                 {
@@ -507,7 +507,7 @@ namespace ExchangeAuditTool
             head.Controls.Add(clearLogButton);
             head.Controls.Add(title);
 
-            logBox.Dock = DockStyle.Fill; logBox.Multiline = true; logBox.ScrollBars = ScrollBars.Vertical; logBox.ReadOnly = true;
+            logBox.Dock = DockStyle.Fill; logBox.Multiline = true; logBox.ScrollBars = ScrollBars.Both; logBox.ReadOnly = true;
             logBox.BorderStyle = BorderStyle.None; logBox.WordWrap = false; logBox.BackColor = Color.FromArgb(6, 15, 26);
             logBox.ForeColor = Color.FromArgb(187, 198, 211); logBox.Font = new Font("Consolas", 8.5F);
 
