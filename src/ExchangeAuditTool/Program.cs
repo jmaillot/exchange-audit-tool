@@ -195,24 +195,6 @@ namespace ExchangeAuditTool
             min.Dock = DockStyle.Right;
             min.Click += delegate { WindowState = FormWindowState.Minimized; };
 
-            var themeBtn = new Button
-            {
-                Width = 46,
-                FlatStyle = FlatStyle.Flat,
-                BackColor = UiTheme.TitleBar,
-                ForeColor = Color.FromArgb(186, 202, 222),
-                Font = new Font("Segoe UI Symbol", 11F),
-                Text = "◐",
-                TabStop = false,
-                AccessibleName = "Switch theme",
-                AccessibleDescription = "Switch between the dark and light theme"
-            };
-            themeBtn.FlatAppearance.BorderSize = 0;
-            themeBtn.FlatAppearance.MouseOverBackColor = Color.FromArgb(27, 41, 58);
-            _optionTip.SetToolTip(themeBtn, "Switch between the dark and light theme");
-            themeBtn.Click += delegate { ApplyTheme(!UiTheme.IsLight); };
-
-            bar.Controls.Add(themeBtn);
             bar.Controls.Add(min);
             bar.Controls.Add(max);
             bar.Controls.Add(close);
@@ -377,12 +359,21 @@ namespace ExchangeAuditTool
             footerStatus.Font = new Font("Segoe UI", 8.5F);
             footerStatus.TextAlign = ContentAlignment.MiddleLeft;
 
-            var version = new Label { Text = "v" + Application.ProductVersion, Dock = DockStyle.Bottom, Height = 20, ForeColor = UiTheme.SideMuted, Font = new Font("Segoe UI", 8.5F), TextAlign = ContentAlignment.MiddleLeft };
+            var bottomRow = new Panel { Dock = DockStyle.Bottom, Height = 34, BackColor = UiTheme.Sidebar };
+            var version = new Label { Text = "v" + Application.ProductVersion, Dock = DockStyle.Fill, ForeColor = UiTheme.SideMuted, Font = new Font("Segoe UI", 8.5F), TextAlign = ContentAlignment.MiddleLeft, BackColor = UiTheme.Sidebar };
+            var themeBtn = new ModernButton { Text = "◐", Dock = DockStyle.Right, Width = 44, Height = 30, Padding = new Padding(0) };
+            themeBtn.Font = new Font("Segoe UI Symbol", 11F);
+            themeBtn.AccessibleName = "Switch theme";
+            themeBtn.AccessibleDescription = "Switch between the dark and light theme";
+            _optionTip.SetToolTip(themeBtn, "Switch between the dark and light theme");
             _optionTip.SetToolTip(version, "Credits: Jérémy MAILLOT - jmaillot@prodware.fr");
+            themeBtn.Click += delegate { ApplyTheme(!UiTheme.IsLight); };
+            bottomRow.Controls.Add(version);
+            bottomRow.Controls.Add(themeBtn);
 
             sidebar.Controls.Add(navHost);
             sidebar.Controls.Add(brand);
-            sidebar.Controls.Add(version);
+            sidebar.Controls.Add(bottomRow);
             sidebar.Controls.Add(footerStatus);
             return sidebar;
         }
