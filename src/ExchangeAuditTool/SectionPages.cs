@@ -166,8 +166,8 @@ namespace ExchangeAuditTool
             profileRow.Controls.Add(profileDelete);
             profileRow.Controls.Add(profileSave);
 
-            var helperRow = new Panel { Dock = DockStyle.Top, Height = 48, BackColor = UiTheme.Window, Padding = new Padding(0, 8, 0, 0) };
-            var helperLabel = new Label { Text = "Choose an existing profile above, or set your UserPrincipalName below.", Dock = DockStyle.Fill, ForeColor = Color.FromArgb(147, 183, 255), Font = new Font("Segoe UI Semibold", 11F), TextAlign = ContentAlignment.MiddleCenter, BackColor = UiTheme.Window };
+            var helperRow = new Panel { Dock = DockStyle.Top, Height = 64, BackColor = UiTheme.Window, Padding = new Padding(0, 10, 0, 0) };
+            var helperLabel = new Label { Text = "Choose an existing profile above, or set your UserPrincipalName below.", Dock = DockStyle.Fill, ForeColor = Color.FromArgb(147, 183, 255), Font = new Font("Segoe UI Semibold", 13F), TextAlign = ContentAlignment.MiddleCenter, BackColor = UiTheme.Window };
             helperRow.Controls.Add(helperLabel);
 
             var modeGroup = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(0, 4, 0, 4) };
