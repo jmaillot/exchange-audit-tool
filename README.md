@@ -37,7 +37,7 @@ Connection modes:
 ## User guide
 
 1. Launch `ExchangeAuditTool_<version>.exe`.
-2. Connection page: pick a mode, fill the fields, `Connect`. The footer confirms who you are connected as.
+2. Connection page: pick a mode, fill the fields, `Connect`. The footer confirms who you are connected as. Use `Save` in the Profile row to remember the fields under a name - next launch restores your last-used profile automatically. Passwords are never stored.
 3. Pick a section in the sidebar (e.g. User mailboxes), tick the properties you need (use `Filter` to find them, `Select all` to toggle), set the Output CSV (default `%USERPROFILE%\Documents\ExchangeAudit\`), `RUN AUDIT`. Each run has its own Cancel and live progress in its Results header.
 4. On success the CSV is previewed in the grid (first 200 rows). `Open CSV` opens the file, `Folder` opens its location. With the `XLSX` box checked (default), a formatted workbook (bold header, filter, frozen top row) is saved next to the CSV and the `XLSX` button opens it.
 

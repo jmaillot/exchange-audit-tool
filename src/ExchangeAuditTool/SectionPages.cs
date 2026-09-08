@@ -149,6 +149,27 @@ namespace ExchangeAuditTool
 
             var head = NewSectionHeader("connect", "Exchange connection", "Connect once - the session stays open until you close the app.");
 
+            // Declared up front: the Connect button handler below captures
+            // these (C# forbids capturing locals declared later in the method).
+            var profiles = new List<ConnectionProfile>();
+            string lastUsedProfile = "";
+            bool applyingProfile = false;
+            var profileRow = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = UiTheme.Surface };
+            var profileLabel = new Label { Text = "Profile", Dock = DockStyle.Left, Width = 90, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
+            var profileHost = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 7, 8, 7), BackColor = UiTheme.Surface };
+            var profileBox = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDown, AutoCompleteMode = AutoCompleteMode.SuggestAppend, AutoCompleteSource = AutoCompleteSource.ListItems, BackColor = UiTheme.FieldBack, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 9F) };
+            profileHost.Controls.Add(profileBox);
+            var profileDelete = new ModernButton { Text = "Delete", Dock = DockStyle.Right, Width = 76, Height = 32, Padding = new Padding(0) };
+            var profileSave = new ModernButton { Text = "Save", Dock = DockStyle.Right, Width = 76, Height = 32, Padding = new Padding(0) };
+            profileRow.Controls.Add(profileHost);
+            profileRow.Controls.Add(profileLabel);
+            profileRow.Controls.Add(profileDelete);
+            profileRow.Controls.Add(profileSave);
+
+            var helperRow = new Panel { Dock = DockStyle.Top, Height = 64, BackColor = UiTheme.Window, Padding = new Padding(0, 10, 0, 0) };
+            var helperLabel = new Label { Text = "Choose an existing profile above, or set your UserPrincipalName below.", Dock = DockStyle.Fill, ForeColor = Color.FromArgb(147, 183, 255), Font = new Font("Segoe UI Semibold", 13F), TextAlign = ContentAlignment.MiddleCenter, BackColor = UiTheme.Window };
+            helperRow.Controls.Add(helperLabel);
+
             var modeGroup = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(0, 4, 0, 4) };
             var rInteractive = NewRadio("Exchange Online (interactive)", true);
             var rApp = NewRadio("Exchange Online (app-only cert)", false);
@@ -223,6 +244,124 @@ namespace ExchangeAuditTool
 
             // Keep Basic and HTTPS in sync (Basic should be used over HTTPS).
             rBasic.CheckedChanged += delegate { if (rBasic.Checked) cbHttps.Checked = true; };
+
+            // ---- Saved connection profiles: state above, logic here ------------
+            // (field/radio locals are only declared further down).
+            Action updateHelper = delegate
+            {
+                string sel = profileBox.SelectedItem as string;
+                bool hasProfile = !string.IsNullOrEmpty(sel);
+                bool hasUpn = ((tbUpn.Text ?? "").Trim().Length > 0);
+                helperRow.Visible = rInteractive.Checked && !hasProfile && !hasUpn;
+            };
+
+            Func<ConnectionProfile> captureProfile = delegate
+            {
+                var p = new ConnectionProfile();
+                p.Mode = rInteractive.Checked ? ConnectionMode.ExchangeOnlineInteractive
+                    : rApp.Checked ? ConnectionMode.ExchangeOnlineApp
+                    : rLocal.Checked ? ConnectionMode.OnPremisesLocal
+                    : ConnectionMode.OnPremisesRemote;
+                p.Upn = tbUpn.Text.Trim();
+                p.DisableWam = cbDevice.Checked;
+                p.AppId = tbAppId.Text.Trim();
+                p.Organization = tbOrg.Text.Trim();
+                p.CertThumbprint = tbThumb.Text.Trim();
+                p.RemoteServer = tbRemoteServer.Text.Trim();
+                p.RemoteUser = tbRemoteUser.Text.Trim();
+                p.RemoteAuth = rBasic.Checked ? RemoteAuthMode.Basic : RemoteAuthMode.Kerberos;
+                p.RemoteUseHttps = cbHttps.Checked;
+                return p;
+            };
+
+            Action<ConnectionProfile> applyProfile = delegate (ConnectionProfile p)
+            {
+                if (p == null) return;
+                rInteractive.Checked = p.Mode == ConnectionMode.ExchangeOnlineInteractive;
+                rApp.Checked = p.Mode == ConnectionMode.ExchangeOnlineApp;
+                rLocal.Checked = p.Mode == ConnectionMode.OnPremisesLocal;
+                rRemote.Checked = p.Mode == ConnectionMode.OnPremisesRemote;
+                tbUpn.Text = p.Upn;
+                cbDevice.Checked = p.DisableWam;
+                tbAppId.Text = p.AppId;
+                tbOrg.Text = p.Organization;
+                tbThumb.Text = p.CertThumbprint;
+                tbRemoteServer.Text = p.RemoteServer;
+                tbRemoteUser.Text = p.RemoteUser;
+                rBasic.Checked = p.RemoteAuth == RemoteAuthMode.Basic;
+                rKerb.Checked = p.RemoteAuth != RemoteAuthMode.Basic;
+                cbHttps.Checked = p.RemoteUseHttps;
+                updateHelper();
+                AppendLog("Profile applied: " + p.Name);
+            };
+
+            Action refreshProfiles = delegate
+            {
+                List<ConnectionProfile> loaded;
+                string last;
+                ConnectionProfileStore.Load(out loaded, out last);
+                lastUsedProfile = last;
+                profiles.Clear();
+                profiles.AddRange(loaded);
+                string keep = profileBox.Text;
+                applyingProfile = true;
+                profileBox.BeginUpdate();
+                profileBox.Items.Clear();
+                foreach (ConnectionProfile p in profiles) profileBox.Items.Add(p.Name);
+                profileBox.EndUpdate();
+                profileBox.Text = keep;
+                applyingProfile = false;
+            };
+
+            profileBox.SelectedIndexChanged += delegate
+            {
+                if (applyingProfile) return;
+                string name = profileBox.SelectedItem as string;
+                if (string.IsNullOrEmpty(name)) return;
+                foreach (ConnectionProfile p in profiles)
+                    if (p.Name == name) { applyProfile(p); break; }
+            };
+
+            profileSave.Click += delegate
+            {
+                string name = (profileBox.Text ?? "").Trim();
+                if (name.Length == 0) { Warn("Type a profile name first."); profileBox.Focus(); return; }
+                ConnectionProfile p = captureProfile();
+                p.Name = name;
+                bool replaced = false;
+                for (int i = 0; i < profiles.Count; i++)
+                    if (profiles[i].Name == name) { profiles[i] = p; replaced = true; break; }
+                if (!replaced) profiles.Add(p);
+                ConnectionProfileStore.Save(profiles, name);
+                refreshProfiles();
+                applyingProfile = true;
+                profileBox.SelectedItem = name;
+                applyingProfile = false;
+                AppendLog((replaced ? "Updated" : "Saved") + " connection profile: " + name);
+            };
+
+            profileDelete.Click += delegate
+            {
+                string name = (profileBox.SelectedItem as string) ?? (profileBox.Text ?? "").Trim();
+                if (string.IsNullOrEmpty(name)) { Warn("Select a profile first."); return; }
+                bool removed = false;
+                for (int i = profiles.Count - 1; i >= 0; i--)
+                    if (profiles[i].Name == name) { profiles.RemoveAt(i); removed = true; }
+                if (!removed) { Warn("No such profile: " + name); return; }
+                ConnectionProfileStore.Save(profiles, "");
+                refreshProfiles();
+                profileBox.Text = "";
+                AppendLog("Deleted connection profile: " + name);
+            };
+            _optionTip.SetToolTip(profileBox, "Pick a saved connection or type a new name, then Save");
+            _optionTip.SetToolTip(profileSave, "Save the current connection fields under this name");
+            _optionTip.SetToolTip(profileDelete, "Delete the selected profile (passwords are never stored)");
+            profileBox.TextChanged += delegate { updateHelper(); };
+            tbUpn.TextChanged += delegate { updateHelper(); };
+            rInteractive.CheckedChanged += delegate { updateHelper(); };
+            rApp.CheckedChanged += delegate { updateHelper(); };
+            rLocal.CheckedChanged += delegate { updateHelper(); };
+            rRemote.CheckedChanged += delegate { updateHelper(); };
 
             var fields = new Panel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, Padding = new Padding(0, 8, 0, 0) };
             fields.Controls.Add(rowLocalInfo);
@@ -351,6 +490,10 @@ namespace ExchangeAuditTool
                 {
                     ApplyScopeDefaults(ConnectionSettings.IsOnline);
                     await RefreshConnectedAsAsync();
+                    string current = (profileBox.Text ?? "").Trim();
+                    foreach (ConnectionProfile p in profiles)
+                        if (p.Name == current) { lastUsedProfile = current; break; }
+                    ConnectionProfileStore.Save(profiles, lastUsedProfile);
                 }
                 else SetConnectedAs(null);
             };
@@ -383,6 +526,17 @@ namespace ExchangeAuditTool
             };
 
             applyMode();
+            refreshProfiles();
+            if (!string.IsNullOrEmpty(lastUsedProfile))
+                foreach (ConnectionProfile p in profiles)
+                    if (p.Name == lastUsedProfile)
+                    {
+                        applyingProfile = true;
+                        profileBox.SelectedItem = p.Name;
+                        applyingProfile = false;
+                        applyProfile(p);
+                        break;
+                    }
             card.Controls.Add(buttons);
             card.Controls.Add(fields);
             card.Controls.Add(logCmdRow);
@@ -390,6 +544,9 @@ namespace ExchangeAuditTool
             card.Controls.Add(moduleRow);
             card.Controls.Add(modeGroup);
             card.Controls.Add(head);
+            card.Controls.Add(profileRow);
+            updateHelper();
+            page.Controls.Add(helperRow);
             page.Controls.Add(card);
             return page;
         }
