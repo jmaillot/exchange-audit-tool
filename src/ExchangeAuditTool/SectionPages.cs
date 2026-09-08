@@ -497,7 +497,75 @@ namespace ExchangeAuditTool
                 built.Add(BuildOptionGroup(ui, grp));
             for (int i = built.Count - 1; i >= 0; i--) groupsHost.Controls.Add(built[i]);
 
+            var filterRow = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = UiTheme.Surface };
+            var filterLabel = new Label { Text = "Filter", Dock = DockStyle.Left, Width = 60, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
+            var filterHost = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 7, 0, 7), BackColor = filterRow.BackColor };
+            var tbFilter = NewField();
+            tbFilter.Dock = DockStyle.Fill;
+            filterHost.Controls.Add(tbFilter);
+            filterRow.Controls.Add(filterHost);
+            filterRow.Controls.Add(filterLabel);
+            Action applyFilter = delegate
+            {
+                string f = (tbFilter.Text ?? "").Trim().ToLowerInvariant();
+                if (f.Length == 0)
+                {
+                    foreach (var kv in ui.Checks)
+                        foreach (CheckBox cb in kv.Value) cb.ForeColor = UiTheme.Text;
+                    foreach (var kv in ui.Radios)
+                        foreach (RadioButton rb in kv.Value) rb.ForeColor = UiTheme.Text;
+                    foreach (Control card in built) card.Visible = true;
+                    return;
+                }
+                foreach (var kv in ui.Checks)
+                    foreach (CheckBox cb in kv.Value)
+                    {
+                        var opt = cb.Tag as AuditOption;
+                        string hay = ((opt != null ? opt.Label : cb.Text) ?? "").ToLowerInvariant();
+                        cb.ForeColor = hay.Contains(f) ? UiTheme.Text : UiTheme.Muted;
+                    }
+                foreach (var kv in ui.Radios)
+                    foreach (RadioButton rb in kv.Value)
+                    {
+                        var opt = rb.Tag as AuditOption;
+                        string hay = ((opt != null ? opt.Label : rb.Text) ?? "").ToLowerInvariant();
+                        rb.ForeColor = hay.Contains(f) ? UiTheme.Text : UiTheme.Muted;
+                    }
+                foreach (Control card in built)
+                {
+                    bool anyMatch = false;
+                    foreach (Control inner in card.Controls)
+                    {
+                        var table = inner as TableLayoutPanel;
+                        if (table == null) continue;
+                        foreach (Control c in table.Controls)
+                        {
+                            var cb = c as CheckBox;
+                            if (cb != null)
+                            {
+                                var opt = cb.Tag as AuditOption;
+                                string hay = ((opt != null ? opt.Label : cb.Text) ?? "").ToLowerInvariant();
+                                if (hay.Contains(f)) { anyMatch = true; break; }
+                                continue;
+                            }
+                            var rb = c as RadioButton;
+                            if (rb != null)
+                            {
+                                var opt = rb.Tag as AuditOption;
+                                string hay = ((opt != null ? opt.Label : rb.Text) ?? "").ToLowerInvariant();
+                                if (hay.Contains(f)) { anyMatch = true; break; }
+                            }
+                        }
+                        if (anyMatch) break;
+                    }
+                    card.Visible = anyMatch;
+                }
+            };
+            tbFilter.TextChanged += delegate { applyFilter(); };
+            _optionTip.SetToolTip(tbFilter, "Type to highlight matching options; groups without matches are hidden");
+
             optionsCard.Controls.Add(groupsHost);
+            optionsCard.Controls.Add(filterRow);
             optionsCard.Controls.Add(headerRow);
 
             var outputRow = NewLabeledRow("Output CSV", null);
