@@ -683,17 +683,22 @@ namespace ExchangeAuditTool
 
         // Per-mailbox / per-folder lookups (regional config, statistics, folder
         // permissions) dominate runtime. Warn before the user starts a slow run.
+        // Slow is declared on the model (AuditOption.Slow / AuditOptionGroup.Slow),
+        // not string-matched here, so new slow options can't silently miss the hint.
         private static bool HasSlowOptions(SectionUi ui)
         {
             foreach (var kv in ui.Checks)
             {
-                bool groupSlow = kv.Key == "folderperms" || kv.Key == "stats";
+                bool groupSlow = false;
+                if (ui.Section != null && ui.Section.Groups != null)
+                    foreach (AuditOptionGroup g in ui.Section.Groups)
+                        if (g.Key == kv.Key) { groupSlow = g.Slow; break; }
                 foreach (CheckBox cb in kv.Value)
                 {
                     if (!cb.Checked) continue;
                     if (groupSlow) return true;
-                    string v = ((AuditOption)cb.Tag).Value;
-                    if (v == "regional" || v == "mailboxsize") return true;
+                    var opt = cb.Tag as AuditOption;
+                    if (opt != null && opt.Slow) return true;
                 }
             }
             return false;

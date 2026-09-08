@@ -84,7 +84,7 @@ namespace ExchangeAuditTool
             section.AddGroup(location);
 
             var extra = new AuditOptionGroup("complementary", "Complementary data", GroupMode.MultiCheck); extra.Columns = 1;
-            extra.Add(new AuditOption("mailboxsize", "Mailbox size in MB (Get-MailboxStatistics)", "mailboxsize", false));
+            extra.Add(new AuditOption("mailboxsize", "Mailbox size in MB (Get-MailboxStatistics)", "mailboxsize", false).MarkSlow());
             section.AddGroup(extra);
 
             PsScriptHelpers.AddSizeGroup(section);
@@ -177,7 +177,7 @@ namespace ExchangeAuditTool
             retention.AddProp("RetainDeletedItemsFor", false);
             section.AddGroup(retention);
 
-            var stats = new AuditOptionGroup("stats", "Statistics (Get-PublicFolderStatistics, slower)", GroupMode.MultiCheck); stats.Columns = 2;
+            var stats = new AuditOptionGroup("stats", "Statistics (Get-PublicFolderStatistics, slower)", GroupMode.MultiCheck).MarkSlow(); stats.Columns = 2;
             stats.Hint = "One call per folder; can be slow on large trees. MaxItemSize is read from the folder object.";
             stats.Add(new AuditOption("ItemCount", "Item count", "ItemCount", false));
             stats.Add(new AuditOption("SizeMB", "Total size (MB)", "SizeMB", false));
@@ -185,7 +185,7 @@ namespace ExchangeAuditTool
             stats.Add(new AuditOption("LastModificationTime", "Last modified", "LastModificationTime", false));
             section.AddGroup(stats);
 
-            var perms = new AuditOptionGroup("perms", "Client permissions (Get-PublicFolderClientPermission, slower)", GroupMode.MultiCheck);
+            var perms = new AuditOptionGroup("perms", "Client permissions (Get-PublicFolderClientPermission, slower)", GroupMode.MultiCheck).MarkSlow();
             perms.Hint = "THE critical data for migration. Inherited is a heuristic (same user+rights present on the parent folder).";
             perms.Columns = 1;
             perms.Add(new AuditOption("clientperms", "Include client permissions", "clientperms", false));
