@@ -17,7 +17,7 @@ Connection modes:
 - On-premises local (run the tool directly on an Exchange server)
 - On-premises remote (connects to `http(s)://<server>/PowerShell/`, Kerberos or Basic)
 
-## Audit coverage (17 sections)
+## Audit coverage (27 sections)
 
 | Area | Sections |
 |---|---|
@@ -39,14 +39,16 @@ Connection modes:
 
 ## User guide
 
-1. Launch `ExchangeAuditTool_<version>.exe`. The `◐` button in the title bar switches between the dark and light theme (remembered for next launch).
+1. Launch `ExchangeAuditTool_<version>.exe`. The `◐` button next to the version label (bottom of the sidebar) switches between the dark and light theme (remembered for next launch).
 2. Connection page: pick a mode, fill the fields, `Connect`. The footer confirms who you are connected as. Use `Save` in the Profile row to remember the fields under a name - next launch restores your last-used profile automatically. Passwords are never stored.
-3. Pick a section in the sidebar (e.g. User mailboxes), tick the properties you need (use `Filter` to find them, `Select all` to toggle), set the Output CSV (default `%USERPROFILE%\Documents\ExchangeAudit\`), `RUN AUDIT`. Each run has its own Cancel and live progress in its Results header.
+3. Pick a section in the sidebar (e.g. User mailboxes), tick the properties you need (use `Filter` to find them, `Select all` to toggle), set the Output CSV (default `%USERPROFILE%\Documents\ExchangeAudit\`), `RUN AUDIT`. Each run has its own Cancel and live progress in its Results header. Prompt-free connection modes run up to 3 sections in parallel (extras queue); modes that can prompt run one at a time on the connected session, so you only sign in once.
 4. On success the CSV is previewed in the grid (first 200 rows). `Open CSV` opens the file, `Folder` opens its location. With the `XLSX` box checked (default), a formatted workbook (bold header, filter, frozen top row) is saved next to the CSV and the `XLSX` button opens it.
 
 Notes:
 
 - Your audit files land in `%USERPROFILE%\Documents\ExchangeAudit\` by default.
+- Sections marked with a scope badge (e.g. on-premises only) refuse to run on the wrong connection with guidance instead of failing.
+- Options flagged "Slow options selected" run one lookup per object and can take much longer - leave them off for a first pass.
 - Timeouts: connect 5 min, audit up to 30 min.
 - The Activity Log at the bottom shows everything the tool does; it is also saved to `%USERPROFILE%\Documents\ExchangeAudit\ExchangeAuditTool.activity.log`.
 - Multi-value cells are `,`-joined inside the `;`-delimited file, so Excel splits columns correctly.
