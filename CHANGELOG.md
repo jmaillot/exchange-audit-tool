@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-09-08
+
 ### Added
 
 - Select-all now toggles only filter-matching options while a filter is typed
