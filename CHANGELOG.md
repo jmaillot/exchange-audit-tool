@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+### Added
+
+- `org-sharing` section (new Organization category): sharing policies, org relationships, federation trust/ID, org config essentials, one object per run
+- `address-policies` section: email address policy filters and templates
+
 ## [1.6.0] - 2026-09-08
 
 ### Added

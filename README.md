@@ -27,6 +27,7 @@ Connection modes:
 | Contacts | Mail users, mail contacts |
 | Domains / Routing | Transport rules, accepted domains, remote domains, connectors |
 | Public Folders | PF mailboxes, folder hierarchy (+ client permissions), mail-enabled public folders |
+| Organization | Sharing policies, org relationships, federation, org config, email address policies |
 
 ## Requirements
 

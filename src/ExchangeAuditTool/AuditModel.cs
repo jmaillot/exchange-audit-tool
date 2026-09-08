@@ -159,6 +159,7 @@ namespace ExchangeAuditTool
             SectionsContacts.Register();
             SectionsPublicFolders.Register();
             SectionsDomainsRouting.Register();
+            SectionsOrganization.Register();
         }
     }
 }
