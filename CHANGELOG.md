@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-08
+
 ### Added
 
 - Saved connection profiles: name, save, delete and auto-restore last-used connection fields (`profiles.json` next to the activity log; passwords are never stored)
