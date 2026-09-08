@@ -55,6 +55,38 @@ namespace ExchangeAuditTool
             return redacted;
         }
 
+        private static bool IsValidUpn(string upn)
+        {
+            if (string.IsNullOrEmpty(upn) || upn.IndexOf(' ') >= 0) return false;
+            int at = upn.IndexOf('@');
+            if (at <= 0 || at != upn.LastIndexOf('@') || at == upn.Length - 1) return false;
+            return upn.IndexOf('.', at) > at + 1 && upn.Length - upn.LastIndexOf('.') > 2;
+        }
+
+        private static bool IsValidThumbprint(string thumb)
+        {
+            if (string.IsNullOrEmpty(thumb) || thumb.Length != 40) return false;
+            foreach (char c in thumb)
+            {
+                bool hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+                if (!hex) return false;
+            }
+            return true;
+        }
+
+        private static bool IsValidHostname(string host)
+        {
+            if (string.IsNullOrEmpty(host) || host.Length < 3 || host.Length > 253) return false;
+            if (host.IndexOf(' ') >= 0 || host.IndexOf('/') >= 0 || host.IndexOf('\\') >= 0) return false;
+            foreach (char c in host)
+            {
+                bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                          (c >= '0' && c <= '9') || c == '-' || c == '.';
+                if (!ok) return false;
+            }
+            return host.IndexOf('.') > 0;
+        }
+
         private sealed class SectionUi
         {
             public AuditSection Section;
@@ -202,25 +234,69 @@ namespace ExchangeAuditTool
                     await RunPowerShellCaptureAsync(ConnectionSettings.BuildDisconnect());
                 }
 
+                string upn = tbUpn.Text.Trim();
+                string appId = tbAppId.Text.Trim();
+                string org = tbOrg.Text.Trim();
+                string thumb = tbThumb.Text.Trim().Replace(" ", "").Replace(":", "");
+                string remoteServer = tbRemoteServer.Text.Trim();
+                string remoteUser = tbRemoteUser.Text.Trim();
+
+                if (rInteractive.Checked && upn.Length > 0 && !IsValidUpn(upn))
+                {
+                    Warn("That UPN does not look like an email address (expected user@domain).");
+                    tbUpn.Focus();
+                    tbUpn.SelectAll();
+                    return;
+                }
+                if (rApp.Checked)
+                {
+                    Guid parsedAppId;
+                    if (string.IsNullOrEmpty(appId) || !Guid.TryParse(appId, out parsedAppId))
+                    {
+                        Warn("Enter a valid Application (client) ID (GUID).");
+                        tbAppId.Focus();
+                        tbAppId.SelectAll();
+                        return;
+                    }
+                    if (string.IsNullOrEmpty(org) || org.IndexOf('.') < 0 || org.IndexOf(' ') >= 0)
+                    {
+                        Warn("Enter the tenant organization (e.g. contoso.onmicrosoft.com).");
+                        tbOrg.Focus();
+                        tbOrg.SelectAll();
+                        return;
+                    }
+                    if (!IsValidThumbprint(thumb))
+                    {
+                        Warn("Enter a valid 40-character certificate thumbprint (hex).");
+                        tbThumb.Focus();
+                        tbThumb.SelectAll();
+                        return;
+                    }
+                }
+                if (rRemote.Checked)
+                {
+                    if (string.IsNullOrEmpty(remoteServer) || !IsValidHostname(remoteServer))
+                    {
+                        Warn("Enter the Exchange server FQDN for the remote PowerShell connection.");
+                        tbRemoteServer.Focus();
+                        tbRemoteServer.SelectAll();
+                        return;
+                    }
+                }
+
                 ConnectionSettings.Mode = rInteractive.Checked ? ConnectionMode.ExchangeOnlineInteractive
                                         : rApp.Checked ? ConnectionMode.ExchangeOnlineApp
                                         : rLocal.Checked ? ConnectionMode.OnPremisesLocal
                                         : ConnectionMode.OnPremisesRemote;
-                ConnectionSettings.Upn = tbUpn.Text.Trim();
+                ConnectionSettings.Upn = upn;
                 ConnectionSettings.DisableWam = cbDevice.Checked;
-                ConnectionSettings.AppId = tbAppId.Text.Trim();
-                ConnectionSettings.Organization = tbOrg.Text.Trim();
-                ConnectionSettings.CertThumbprint = tbThumb.Text.Trim();
-                ConnectionSettings.RemoteServer = tbRemoteServer.Text.Trim();
-                ConnectionSettings.RemoteUser = tbRemoteUser.Text.Trim();
+                ConnectionSettings.AppId = appId;
+                ConnectionSettings.Organization = org;
+                ConnectionSettings.CertThumbprint = thumb;
+                ConnectionSettings.RemoteServer = remoteServer;
+                ConnectionSettings.RemoteUser = remoteUser;
                 ConnectionSettings.RemoteAuth = rBasic.Checked ? RemoteAuthMode.Basic : RemoteAuthMode.Kerberos;
                 ConnectionSettings.RemoteUseHttps = cbHttps.Checked;
-
-                if (rRemote.Checked && string.IsNullOrEmpty(ConnectionSettings.RemoteServer))
-                {
-                    Warn("Enter the Exchange server FQDN for the remote PowerShell connection.");
-                    return;
-                }
 
                 _connStatus.Text = ConnectionSettings.Summary();
 
