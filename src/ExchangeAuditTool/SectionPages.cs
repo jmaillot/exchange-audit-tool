@@ -984,6 +984,16 @@ namespace ExchangeAuditTool
         private async Task RunSectionAsync(SectionUi ui)
         {
             AuditSection section = ui.Section;
+            if (section.Scope == AuditScope.OnPremises && ConnectionSettings.IsOnline)
+            {
+                Warn("This section is on-premises only (its cmdlets do not exist in Exchange Online). Connect to an on-premises Exchange instead.");
+                return;
+            }
+            if (section.Scope == AuditScope.ExchangeOnline && !ConnectionSettings.IsOnline)
+            {
+                Warn("This section is Exchange Online only. Connect to Exchange Online instead.");
+                return;
+            }
             string csv = ui.OutputPath.Text.Trim();
             if (!IsValidCsvPath(csv))
             {
