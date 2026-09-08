@@ -4,16 +4,23 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-08
+
 ### Added
 
 - Direct `.xlsx` export beside every CSV (bold header, autofilter, frozen top row, sized columns, truncation guard at Excel limits) via a dependency-free `XlsxWriter` - no Excel install, no NuGet; opt-out per section with the `XLSX` checkbox, `XLSX` button opens the workbook
-- Parallel section audits: each section runs on its own PowerShell process (up to 3 concurrent, extras queue with visible status), per-section Cancel, live per-section progress
-- Serialized worker sign-in: parallel audits prompt once and follow-ups reuse the cached session instead of prompting per worker
-- Single sign-in guarantee: modes that can prompt (interactive, Basic/credential dialog) run audits on the connected session one at a time instead of prompting per worker
 
 ### Fixed
 
 - XLSX writer delegates content types/relationships to the packaging API instead of colliding hand-written parts, emits `cols` before `sheetData`, and surfaces failures in the result line instead of the log only
+
+## [1.3.0] - 2026-09-08
+
+### Added
+
+- Parallel section audits: each section runs on its own PowerShell process (up to 3 concurrent, extras queue with visible status), per-section Cancel, live per-section progress
+- Serialized worker sign-in: parallel audits prompt once and follow-ups reuse the cached session instead of prompting per worker
+- Single sign-in guarantee: modes that can prompt (interactive, Basic/credential dialog) run audits on the connected session one at a time instead of prompting per worker
 
 ## [1.2.2] - 2026-09-08
 
