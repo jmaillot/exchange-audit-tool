@@ -68,18 +68,15 @@ namespace ExchangeAuditTool.Tests
         public void OrgConfigBatch_BuildsQueries()
         {
             var ctx = new ScriptContext("C:\\Exports\\Org.csv");
-            foreach (KeyValuePair<string, string> kv in new Dictionary<string, string>
-            {
-                { "journal-rules", "Get-JournalRule" },
-                { "certificates", "Get-ExchangeCertificate" }
-            })
-            {
-                AuditSection section = Find(kv.Key);
-                Assert.NotNull(section);
-                Assert.Equal("Organization", section.Category);
-                Assert.Equal(AuditScope.Both, section.Scope);
-                Assert.Contains(kv.Value, section.BuildScript(new AuditSelection(), ctx));
-            }
+            AuditSection journal = Find("journal-rules");
+            Assert.Equal("Organization", journal.Category);
+            Assert.Equal(AuditScope.Both, journal.Scope);
+            Assert.Contains("Get-JournalRule", journal.BuildScript(new AuditSelection(), ctx));
+
+            AuditSection certs = Find("certificates");
+            Assert.Equal("Organization", certs.Category);
+            Assert.Equal(AuditScope.OnPremises, certs.Scope);
+            Assert.Contains("Get-ExchangeCertificate", certs.BuildScript(new AuditSelection(), ctx));
 
             AuditSection retention = Find("retention-policies");
             var sel = new AuditSelection();
@@ -89,6 +86,7 @@ namespace ExchangeAuditTool.Tests
             Assert.Contains("Get-RetentionPolicyTag", retention.BuildScript(sel, ctx));
 
             AuditSection books = Find("address-books");
+            Assert.Equal(AuditScope.OnPremises, books.Scope);
             sel.Set("object", new List<string>(new string[] { "oab" }));
             Assert.Contains("Get-OfflineAddressBook", books.BuildScript(sel, ctx));
             sel.Set("object", new List<string>(new string[] { "lists" }));

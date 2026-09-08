@@ -308,7 +308,7 @@ namespace ExchangeAuditTool
                 "Address book export",
                 "Audit offline address books and address lists (Get-OfflineAddressBook / Get-AddressList): OAB must be regenerated after migration.",
                 "group",
-                AuditScope.Both);
+                AuditScope.OnPremises);
             section.Category = "Organization";
             section.DefaultFileName = "AddressBooks.csv";
 
@@ -369,7 +369,7 @@ namespace ExchangeAuditTool
                 "Certificate export",
                 "Audit Exchange certificates (Get-ExchangeCertificate): expired federation/SMTP certs are the classic cutover-day surprise.",
                 "shield",
-                AuditScope.Both);
+                AuditScope.OnPremises);
             section.Category = "Organization";
             section.DefaultFileName = "Certificates.csv";
 
