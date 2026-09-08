@@ -555,7 +555,7 @@ namespace ExchangeAuditTool
             rHead.Controls.Add(folderBtn);
             rHead.Controls.Add(rTitle);
 
-            ui.ResultInfo = new Label { Text = "No results yet.", Dock = DockStyle.Top, Height = 22, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.3F) };
+            ui.ResultInfo = new Label { Text = "No results yet.", Dock = DockStyle.Top, Height = 22, ForeColor = UiTheme.Muted, Font = new Font("Segoe UI", 8.3F), AutoEllipsis = true };
 
             ui.Grid = new DataGridView
             {
@@ -771,9 +771,9 @@ namespace ExchangeAuditTool
                         catch { size = "?"; }
                         string took = sw.Elapsed.ToString("mm\\:ss");
                         if (total > 200)
-                            ui.ResultInfo.Text = "✓ Exported " + total + " rows (" + size + ") in " + took + " (previewing first 200).";
+                            SetResult(ui, "✓ Exported " + total + " rows (" + size + ") in " + took + " (previewing first 200). Full path: " + csv, UiTheme.Green);
                         else
-                            ui.ResultInfo.Text = "✓ Exported to " + Path.GetFileName(csv) + " (" + size + ") in " + took + "  -  " + previewed + " row(s) previewed.";
+                            SetResult(ui, "✓ Exported to " + Path.GetFileName(csv) + " (" + size + ") in " + took + "  -  " + previewed + " row(s) previewed. Full path: " + csv, UiTheme.Green);
                         ui.EmptyState.Visible = total == 0;
                         ui.ResultInfo.ForeColor = UiTheme.Green;
                         SetFooter(section.NavTitle + " done in " + took, UiTheme.Green);
@@ -781,14 +781,12 @@ namespace ExchangeAuditTool
                     }
                     else if (result.Output.Contains("[cancelled by user]"))
                     {
-                        ui.ResultInfo.Text = "✗ Cancelled by user after " + sw.Elapsed.ToString("mm\\:ss") + " - partial output discarded.";
-                        ui.ResultInfo.ForeColor = UiTheme.Orange;
+                        SetResult(ui, "✗ Cancelled by user after " + sw.Elapsed.ToString("mm\\:ss") + " - partial output discarded.", UiTheme.Orange);
                         SetFooter(section.NavTitle + " cancelled", UiTheme.Orange);
                     }
                     else
                     {
-                        ui.ResultInfo.Text = "✗ Run failed in " + sw.Elapsed.ToString("mm\\:ss") + " - see the activity log.";
-                        ui.ResultInfo.ForeColor = UiTheme.Red;
+                        SetResult(ui, "✗ Run failed in " + sw.Elapsed.ToString("mm\\:ss") + " - see the activity log.", UiTheme.Red);
                         SetFooter(section.NavTitle + " failed", UiTheme.Red);
                     }
                 }
@@ -822,6 +820,13 @@ namespace ExchangeAuditTool
             if (bytes < 1024) return bytes + " B";
             if (bytes < 1048576) return (bytes / 1024) + " KB";
             return (bytes / 1048576.0).ToString("0.0") + " MB";
+        }
+
+        private void SetResult(SectionUi ui, string text, Color color)
+        {
+            ui.ResultInfo.Text = text;
+            ui.ResultInfo.ForeColor = color;
+            _optionTip.SetToolTip(ui.ResultInfo, text);
         }
 
         private Task<PsResult> RunPowerShellCaptureAsync(string command)
