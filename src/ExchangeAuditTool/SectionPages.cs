@@ -106,8 +106,8 @@ namespace ExchangeAuditTool
             connectedRow.Controls.Add(_connectedAs);
             connectedRow.Controls.Add(connectedLabel);
 
-            var logCmdRow = new Panel { Dock = DockStyle.Top, Height = 28, BackColor = UiTheme.Surface };
-            var cbLogCmd = new CheckBox { Text = "Log executed PowerShell commands in the Activity Log", Checked = _logCommands, AutoSize = true, Location = new Point(0, 4), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
+            var logCmdRow = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(0, 4, 0, 4) };
+            var cbLogCmd = new CheckBox { Text = "Log executed PowerShell commands in the Activity Log", Checked = _logCommands, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F), Margin = new Padding(0, 0, 0, 0) };
             cbLogCmd.CheckedChanged += delegate { _logCommands = cbLogCmd.Checked; };
             logCmdRow.Controls.Add(cbLogCmd);
 
@@ -118,8 +118,8 @@ namespace ExchangeAuditTool
 
             var rowUpn = NewLabeledRow("User principal name", tbUpn);
 
-            var rowDevice = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = UiTheme.Surface };
-            var cbDevice = new CheckBox { Text = "Open external browser for sign-in (disable WAM) - recommended", Checked = ConnectionSettings.DisableWam, AutoSize = true, Location = new Point(150, 8), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
+            var rowDevice = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(150, 4, 0, 4) };
+            var cbDevice = new CheckBox { Text = "Open external browser for sign-in (disable WAM) - recommended", Checked = ConnectionSettings.DisableWam, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F), Margin = new Padding(0, 0, 0, 0) };
             rowDevice.Controls.Add(cbDevice);
 
             var rowAppId = NewLabeledRow("Application (client) ID", tbAppId);
@@ -136,11 +136,11 @@ namespace ExchangeAuditTool
             var rowRemoteServer = NewLabeledRow("Exchange server (FQDN)", tbRemoteServer);
             var rowRemoteUser = NewLabeledRow("Username (optional)", tbRemoteUser);
 
-            var rowRemoteAuth = new Panel { Dock = DockStyle.Top, Height = 40, BackColor = UiTheme.Surface };
-            var authLabel = new Label { Text = "Authentication", Dock = DockStyle.Left, Width = 150, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F) };
-            var rKerb = new RadioButton { Text = "Kerberos (domain-joined)", Checked = true, AutoSize = true, Location = new Point(154, 10), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
-            var rBasic = new RadioButton { Text = "Basic (off-domain)", Checked = false, AutoSize = true, Location = new Point(330, 10), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
-            var cbHttps = new CheckBox { Text = "Use HTTPS", Checked = false, AutoSize = true, Location = new Point(470, 10), ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F) };
+            var rowRemoteAuth = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, BackColor = UiTheme.Surface, FlowDirection = FlowDirection.LeftToRight, WrapContents = true, Padding = new Padding(0, 4, 0, 4) };
+            var authLabel = new Label { Text = "Authentication", Width = 150, Height = 24, ForeColor = UiTheme.Muted, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI Semibold", 8.8F), Margin = new Padding(0, 4, 0, 4) };
+            var rKerb = new RadioButton { Text = "Kerberos (domain-joined)", Checked = true, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F), Margin = new Padding(4, 6, 16, 4) };
+            var rBasic = new RadioButton { Text = "Basic (off-domain)", Checked = false, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F), Margin = new Padding(0, 6, 16, 4) };
+            var cbHttps = new CheckBox { Text = "Use HTTPS", Checked = false, AutoSize = true, ForeColor = UiTheme.Text, Font = new Font("Segoe UI", 8.8F), Margin = new Padding(0, 6, 0, 4) };
             rowRemoteAuth.Controls.Add(cbHttps);
             rowRemoteAuth.Controls.Add(rBasic);
             rowRemoteAuth.Controls.Add(rKerb);
