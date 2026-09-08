@@ -160,6 +160,7 @@ namespace ExchangeAuditTool
             SectionsPublicFolders.Register();
             SectionsDomainsRouting.Register();
             SectionsOrganization.Register();
+            SectionsProtection.Register();
         }
     }
 }

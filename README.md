@@ -28,6 +28,7 @@ Connection modes:
 | Domains / Routing | Transport rules, accepted domains, remote domains, connectors |
 | Public Folders | PF mailboxes, folder hierarchy (+ client permissions), mail-enabled public folders |
 | Organization | Sharing, relationships, federation, org config, address policies, journal rules, retention, address books, certificates, OWA/role policies |
+| Protection | Anti-spam, anti-malware, anti-phishing and DLP policies + rules (Exchange Online) |
 
 ## Requirements
 
