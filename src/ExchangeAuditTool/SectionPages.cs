@@ -128,11 +128,11 @@ namespace ExchangeAuditTool
         private readonly SemaphoreSlim _runSlots = new SemaphoreSlim(MaxParallelAudits, MaxParallelAudits);
         private int _runningAudits;
 
-        // Prompt modes (interactive sign-in, Basic/credential dialog) share one
-        // audit session so the user authenticates exactly once; audits queue on
-        // it instead of running in parallel.
-        private readonly PowerShellSession _sharedAudit = new PowerShellSession();
-        private readonly SemaphoreSlim _sharedAuditGate = new SemaphoreSlim(1, 1);
+        // Prompt modes (interactive sign-in, Basic/credential dialog) run audits
+        // on the connected control session, serialized: exactly one sign-in,
+        // then every audit reuses it. A separate process could never see the
+        // control session's connection, so it would prompt again.
+        private readonly SemaphoreSlim _serialAuditGate = new SemaphoreSlim(1, 1);
 
         // Worker sign-in is serialized: the first worker prompts (browser /
         // credential dialog) and follow-ups reuse the cached token, so parallel
@@ -855,8 +855,8 @@ namespace ExchangeAuditTool
             int cap;
             if (shared)
             {
-                session = _sharedAudit;
-                gate = _sharedAuditGate;
+                session = _ps;
+                gate = _serialAuditGate;
                 cap = 1;
             }
             else
@@ -1043,8 +1043,6 @@ namespace ExchangeAuditTool
             }
             catch { }
             finally { _ps.Dispose(); }
-            try { _sharedAudit.Dispose(); }
-            catch { }
             foreach (var kv in _sectionUi)
             {
                 PowerShellSession ps = kv.Value.Ps;

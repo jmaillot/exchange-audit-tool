@@ -8,7 +8,7 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 - Parallel section audits: each section runs on its own PowerShell process (up to 3 concurrent, extras queue with visible status), per-section Cancel, live per-section progress
 - Serialized worker sign-in: parallel audits prompt once and follow-ups reuse the cached session instead of prompting per worker
-- Single sign-in guarantee: modes that can prompt (interactive, Basic/credential dialog) share one audit session and queue instead of prompting per worker
+- Single sign-in guarantee: modes that can prompt (interactive, Basic/credential dialog) run audits on the connected session one at a time instead of prompting per worker
 
 ## [1.2.2] - 2026-09-08
 
