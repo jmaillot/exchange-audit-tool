@@ -124,6 +124,7 @@ namespace ExchangeAuditTool
                 string membershipMode = sel.First("membership", "groups");
                 bool sa = sel.IsSelected("permissions", "sendas");
                 bool sob = sel.IsSelected("permissions", "sendonbehalf");
+                bool autoDetect = sel.IsSelected("auto", "autodetect");
 
                 var chosen = new List<string>();
                 foreach (string gk in DistPropGroups)
@@ -136,6 +137,7 @@ namespace ExchangeAuditTool
 
                 var sb = new StringBuilder();
                 if (needResolver || sob || membershipMode == "expand") { string getRecip = ConnectionSettings.IsOnline ? "Get-EXORecipient" : "Get-Recipient"; PsScriptHelpers.EmitResolver(sb, getRecip, false); }
+                if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
 
                 sb.AppendLine("Write-Host 'Querying groups...'");
                 sb.AppendLine("$groups = @(Get-DistributionGroup -ResultSize " + resultSize + " -RecipientTypeDetails " + filterType + ")");
@@ -187,6 +189,7 @@ namespace ExchangeAuditTool
                 }
 
                 sb.AppendLine();
+                if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();
@@ -286,6 +289,7 @@ namespace ExchangeAuditTool
                 string snap = sel.First("snapshot", "none");
                 bool sa = sel.IsSelected("permissions", "sendas");
                 bool sob = sel.IsSelected("permissions", "sendonbehalf");
+                bool autoDetect = sel.IsSelected("auto", "autodetect");
 
                 var chosen = new List<string>();
                 foreach (string gk in DynPropGroups)
@@ -298,6 +302,7 @@ namespace ExchangeAuditTool
 
                 var sb = new StringBuilder();
                 if (needResolver || sob || snap == "expand") { string getRecip = ConnectionSettings.IsOnline ? "Get-EXORecipient" : "Get-Recipient"; PsScriptHelpers.EmitResolver(sb, getRecip, false); }
+                if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
 
                 sb.AppendLine("Write-Host 'Querying dynamic distribution groups...'");
                 sb.AppendLine("$groups = @(Get-DynamicDistributionGroup -ResultSize " + resultSize + ")");
@@ -349,6 +354,7 @@ namespace ExchangeAuditTool
                 }
 
                 sb.AppendLine();
+                if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();
@@ -466,6 +472,7 @@ namespace ExchangeAuditTool
             {
                 string resultSize = sel.First("size", "Unlimited");
                 string membershipMode = sel.First("membership", "groups");
+                bool autoDetect = sel.IsSelected("auto", "autodetect");
 
                 var chosen = new List<string>();
                 bool hasTeam = sel.IsSelected("teams", "hasteam");
@@ -488,6 +495,7 @@ namespace ExchangeAuditTool
 
                 var sb = new StringBuilder();
                 if (needResolver || sob) { string getRecip = ConnectionSettings.IsOnline ? "Get-EXORecipient" : "Get-Recipient"; PsScriptHelpers.EmitResolver(sb, getRecip, false); }
+                if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
 
                 sb.AppendLine("Write-Host 'Querying Microsoft 365 groups...'");
                 sb.AppendLine("$groups = @(Get-UnifiedGroup -ResultSize " + resultSize + ")");
@@ -528,6 +536,7 @@ namespace ExchangeAuditTool
                 }
 
                 sb.AppendLine();
+                if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();

@@ -306,6 +306,7 @@ namespace ExchangeAuditTool
                 bool needSize = sel.IsSelected("complementary", "mailboxsize");
                 bool needCount = sel.IsSelected("complementary", "mailboxitemcount");
                 bool needArchive = sel.IsSelected("complementary", "archivesize");
+                bool autoDetect = sel.IsSelected("auto", "autodetect");
 
                 string getMbx = online ? "Get-EXOMailbox" : "Get-Mailbox";
                 string getMbxPerm = online ? "Get-EXOMailboxPermission" : "Get-MailboxPermission";
@@ -321,6 +322,7 @@ namespace ExchangeAuditTool
                 if (needSize) PsScriptHelpers.EmitSizeHelper(sb, getStats);
                 if (needCount) PsScriptHelpers.EmitCountHelper(sb, getStats);
                 if (needArchive) PsScriptHelpers.EmitArchiveMBHelper(sb, getStats);
+                if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
 
                 sb.AppendLine("Write-Host 'Querying USER mailboxes...'");
                 sb.AppendLine("$mbx = @(" + getMbx + " -ResultSize " + resultSize + " -RecipientTypeDetails UserMailbox" + propsArg + ")");
@@ -433,6 +435,7 @@ namespace ExchangeAuditTool
                 }
 
                 sb.AppendLine();
+                if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();
@@ -475,11 +478,13 @@ namespace ExchangeAuditTool
                 foreach (string v in sel.Selected("devices"))
                     if (!chosen.Contains(v)) chosen.Add(v);
                 if (chosen.Count == 0) chosen.Add("DeviceId");
+                bool autoDetect = sel.IsSelected("auto", "autodetect");
 
                 bool online = ConnectionSettings.IsOnline;
                 string getMbx = online ? "Get-EXOMailbox" : "Get-Mailbox";
 
                 var sb = new StringBuilder();
+                if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
                 sb.AppendLine("Write-Host 'Querying USER mailboxes...'");
                 sb.AppendLine("$mbx = @(" + getMbx + " -ResultSize " + resultSize + " -RecipientTypeDetails UserMailbox)");
                 sb.AppendLine("Write-Host (\"Retrieved {0} user mailbox(es).\" -f $mbx.Count)");
@@ -496,6 +501,7 @@ namespace ExchangeAuditTool
                 sb.AppendLine("    }");
                 sb.AppendLine("}");
                 sb.AppendLine();
+                if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();

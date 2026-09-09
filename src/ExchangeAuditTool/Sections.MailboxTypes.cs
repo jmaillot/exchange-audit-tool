@@ -155,6 +155,7 @@ namespace ExchangeAuditTool
                 bool needSize = sel.IsSelected("complementary", "mailboxsize");
                 bool needCount = sel.IsSelected("complementary", "mailboxitemcount");
                 bool needArchive = sel.IsSelected("complementary", "archivesize");
+                bool autoDetect = sel.IsSelected("auto", "autodetect");
                 bool acctStatus = sel.IsSelected("complementary", "accountstatus");
                 bool regional = sel.IsSelected("complementary", "regional");
 
@@ -171,6 +172,7 @@ namespace ExchangeAuditTool
                 if (needSize) PsScriptHelpers.EmitSizeHelper(sb, getStats);
                 if (needCount) PsScriptHelpers.EmitCountHelper(sb, getStats);
                 if (needArchive) PsScriptHelpers.EmitArchiveMBHelper(sb, getStats);
+                if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
                 if (needResolver || automap) PsScriptHelpers.EmitResolver(sb, getRecip, false);
 
                 sb.AppendLine("Write-Host 'Querying shared mailboxes...'");
@@ -276,6 +278,7 @@ namespace ExchangeAuditTool
                 }
 
                 sb.AppendLine();
+                if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();
@@ -437,6 +440,7 @@ namespace ExchangeAuditTool
                 bool needSize = sel.IsSelected("account", "mailboxsize");
                 bool needCount = sel.IsSelected("account", "mailboxitemcount");
                 bool needArchive = sel.IsSelected("account", "archivesize");
+                bool autoDetect = sel.IsSelected("auto", "autodetect");
                 bool needUser = acctStatus || contactProps.Count > 0;
 
                 if (cal.Contains("ResourceDelegates")) needResolver = true;
@@ -452,6 +456,7 @@ namespace ExchangeAuditTool
                 if (needSize) PsScriptHelpers.EmitSizeHelper(sb, getStats);
                 if (needCount) PsScriptHelpers.EmitCountHelper(sb, getStats);
                 if (needArchive) PsScriptHelpers.EmitArchiveMBHelper(sb, getStats);
+                if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
                 if (needResolver) PsScriptHelpers.EmitResolver(sb, getRecip, false);
 
                 sb.AppendLine("Write-Host 'Querying " + (isRoom ? "room" : "equipment") + " mailboxes...'");
@@ -521,6 +526,7 @@ namespace ExchangeAuditTool
                 }
 
                 sb.AppendLine();
+                if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();

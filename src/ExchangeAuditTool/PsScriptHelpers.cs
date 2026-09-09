@@ -86,6 +86,45 @@ namespace ExchangeAuditTool
             section.AddGroup(size);
         }
 
+        public static AuditOptionGroup BuildSmartModeGroup()
+        {
+            var auto = new AuditOptionGroup("auto", "Smart mode", GroupMode.MultiCheck);
+            auto.Columns = 1;
+            auto.Hint = "Auto-detect keeps only columns that have a value on at least one row (recommended).";
+            auto.Add(new AuditOption("autodetect", "Auto-detect populated columns only (recommended)", "autodetect", true));
+            return auto;
+        }
+
+        // Drops output columns that are empty on every row. Section-agnostic:
+        // it filters the finished $rows, however they were built. Columns that
+        // identify the object are always kept.
+        public static void EmitRemoveEmptyColumns(StringBuilder sb)
+        {
+            sb.AppendLine("function Remove-EmptyColumns {");
+            sb.AppendLine("    param($rows)");
+            sb.AppendLine("    $always = @('Name','DisplayName','Identity','PrimarySmtpAddress','DomainName','Thumbprint','MailboxDisplayName','DeviceId')");
+            sb.AppendLine("    $list = @($rows)");
+            sb.AppendLine("    if ($list.Count -eq 0) { return $rows }");
+            sb.AppendLine("    $cols = @($list[0].PSObject.Properties.Name)");
+            sb.AppendLine("    $keep = New-Object System.Collections.Generic.List[string]");
+            sb.AppendLine("    foreach ($c in $cols) {");
+            sb.AppendLine("        if ($always -contains $c) { $keep.Add($c); continue }");
+            sb.AppendLine("        $has = $false");
+            sb.AppendLine("        foreach ($r in $list) {");
+            sb.AppendLine("            $v = $r.$c");
+            sb.AppendLine("            if ($v -is [bool]) { if ($v) { $has = $true; break } }");
+            sb.AppendLine("            elseif ($v -is [string]) { if ($v.Trim().Length -gt 0) { $has = $true; break } }");
+            sb.AppendLine("            elseif ($null -ne $v -and $v.PSObject.Properties['Count']) { if ($v.Count -gt 0) { $has = $true; break } }");
+            sb.AppendLine("            elseif ($null -ne $v) { if (([string]$v).Trim().Length -gt 0) { $has = $true; break } }");
+            sb.AppendLine("        }");
+            sb.AppendLine("        if ($has) { $keep.Add($c) }");
+            sb.AppendLine("    }");
+            sb.AppendLine("    if ($keep.Count -eq 0) { return $rows }");
+            sb.AppendLine("    return @($rows | Select-Object $keep)");
+            sb.AppendLine("}");
+            sb.AppendLine();
+        }
+
         public static List<string> Collect(AuditSelection sel, params string[] groupKeys)
         {
             var chosen = new List<string>();

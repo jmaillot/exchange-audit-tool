@@ -192,6 +192,7 @@ namespace ExchangeAuditTool
         private static string BuildRecipientScript(AuditSelection sel, ScriptContext ctx, string baseCmdlet, string label, string[] groupKeys)
         {
             string resultSize = sel.First("size", "Unlimited");
+            bool autoDetect = sel.IsSelected("auto", "autodetect");
 
             var chosen = new List<string>();
             foreach (string gk in groupKeys)
@@ -231,6 +232,7 @@ namespace ExchangeAuditTool
             var sb = new StringBuilder();
 
             if (needResolver) PsScriptHelpers.EmitResolver(sb, getRecip, true);
+            if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
 
             sb.AppendLine("Write-Host 'Querying " + label + "s...'");
             sb.AppendLine("$items = @(" + baseCmdlet + " -ResultSize " + resultSize + ")");
@@ -266,6 +268,7 @@ namespace ExchangeAuditTool
             }
 
             sb.AppendLine();
+            if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
             sb.Append(ctx.ExportCsv("$rows"));
             sb.AppendLine("Write-Host 'Export complete.'");
             return sb.ToString();
