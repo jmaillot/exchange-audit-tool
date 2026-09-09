@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format follows Keep a C
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-09-09
+
 ### Added
 
 - Smart mode on every section: auto-detect keeps only columns populated on at least one row (transport rules keeps its custom version)
