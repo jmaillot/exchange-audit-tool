@@ -148,7 +148,17 @@ namespace ExchangeAuditTool
     {
         public static readonly List<AuditSection> Sections = new List<AuditSection>();
 
-        public static void Register(AuditSection section) { Sections.Add(section); }
+        public static void Register(AuditSection section)
+        {
+            // Every section gets Smart mode unless it defines its own "auto"
+            // group (transport rules has a custom one). Inserted first so it
+            // renders at the top of the options card.
+            bool hasAuto = false;
+            foreach (AuditOptionGroup g in section.Groups)
+                if (g.Key == "auto") { hasAuto = true; break; }
+            if (!hasAuto) section.Groups.Insert(0, PsScriptHelpers.BuildSmartModeGroup());
+            Sections.Add(section);
+        }
 
         public static void BuildAll()
         {

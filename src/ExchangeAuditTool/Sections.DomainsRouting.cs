@@ -260,13 +260,16 @@ namespace ExchangeAuditTool
                 var chosen = Collect(sel, "props");
                 if (chosen.Count == 0) chosen.Add("Name");
                 string selectList = BuildSelectList(chosen);
+                bool autoDetect = sel.IsSelected("auto", "autodetect");
 
                 var sb = new StringBuilder();
+                if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
                 sb.AppendLine("Write-Host 'Querying accepted domains...'");
                 sb.AppendLine("$items = @(Get-AcceptedDomain -ErrorAction SilentlyContinue)");
                 sb.AppendLine("Write-Host (\"Retrieved {0} accepted domain(s).\" -f $items.Count)");
                 sb.AppendLine("$rows = $items | Select-Object " + selectList);
                 sb.AppendLine();
+                if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();
@@ -316,13 +319,16 @@ namespace ExchangeAuditTool
                 var chosen = Collect(sel, "identity", "behaviour", "format");
                 if (chosen.Count == 0) chosen.Add("Name");
                 string selectList = BuildSelectList(chosen);
+                bool autoDetect = sel.IsSelected("auto", "autodetect");
 
                 var sb = new StringBuilder();
+                if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
                 sb.AppendLine("Write-Host 'Querying remote domains...'");
                 sb.AppendLine("$items = @(Get-RemoteDomain -ErrorAction SilentlyContinue)");
                 sb.AppendLine("Write-Host (\"Retrieved {0} remote domain(s).\" -f $items.Count)");
                 sb.AppendLine("$rows = $items | Select-Object " + selectList);
                 sb.AppendLine();
+                if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();
@@ -410,6 +416,7 @@ namespace ExchangeAuditTool
             {
                 bool online = ConnectionSettings.IsOnline;
                 bool inbound = sel.First("direction", "inbound") == "inbound";
+                bool autoDetect = sel.IsSelected("auto", "autodetect");
 
                 string cmdlet;
                 string groupKey;
@@ -421,11 +428,13 @@ namespace ExchangeAuditTool
                 string selectList = BuildSelectList(chosen);
 
                 var sb = new StringBuilder();
+                if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
                 sb.AppendLine("Write-Host 'Querying connectors (" + (inbound ? "inbound" : "outbound") + ")...'");
                 sb.AppendLine("$items = @(" + cmdlet + " -ErrorAction SilentlyContinue)");
                 sb.AppendLine("Write-Host (\"Retrieved {0} connector(s).\" -f $items.Count)");
                 sb.AppendLine("$rows = $items | Select-Object " + selectList);
                 sb.AppendLine();
+                if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();

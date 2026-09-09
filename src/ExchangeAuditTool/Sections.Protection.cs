@@ -183,6 +183,7 @@ namespace ExchangeAuditTool
                 sb.AppendLine("Write-Host (\"Retrieved {0} " + label + ".\" -f $items.Count)");
                 sb.AppendLine("$rows = $items | Select-Object " + selectList);
                 sb.AppendLine();
+                if (sel.IsSelected("auto", "autodetect")) { PsScriptHelpers.EmitRemoveEmptyColumns(sb); sb.AppendLine("$rows = Remove-EmptyColumns $rows"); }
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();

@@ -113,12 +113,14 @@ namespace ExchangeAuditTool
 
                 bool needSize = sel.IsSelected("complementary", "mailboxsize");
                 bool needCount = sel.IsSelected("complementary", "mailboxitemcount");
+                bool autoDetect = sel.IsSelected("auto", "autodetect");
                 bool online = ConnectionSettings.IsOnline;
                 string getStats = online ? "Get-EXOMailboxStatistics" : "Get-MailboxStatistics";
 
                 var sb = new StringBuilder();
                 if (needSize) PsScriptHelpers.EmitSizeHelper(sb, getStats);
                 if (needCount) PsScriptHelpers.EmitCountHelper(sb, getStats);
+                if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
 
                 sb.AppendLine("Write-Host 'Querying public folder mailboxes...'");
                 sb.AppendLine("$mbx = @(Get-Mailbox -PublicFolder -ResultSize " + resultSize + ")");
@@ -142,6 +144,7 @@ namespace ExchangeAuditTool
                 }
 
                 sb.AppendLine();
+                if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();
@@ -209,6 +212,7 @@ namespace ExchangeAuditTool
             {
                 string resultSize = sel.First("size", "Unlimited");
                 string mode2 = sel.First("mode", "folders");
+                bool autoDetect = sel.IsSelected("auto", "autodetect");
 
                 var chosen = new List<string>();
                 // tree + quotas + retention are all direct Get-PublicFolder properties.
@@ -229,6 +233,7 @@ namespace ExchangeAuditTool
                 bool expandPerms = mode2 == "expandperms";
 
                 var sb = new StringBuilder();
+                if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
 
                 sb.AppendLine("Write-Host 'Querying public folder hierarchy (recursive)...'");
                 sb.AppendLine("$folders = @(Get-PublicFolder -Recurse -ResultSize " + resultSize + " -ErrorAction SilentlyContinue)");
@@ -314,6 +319,7 @@ namespace ExchangeAuditTool
                 }
 
                 sb.AppendLine();
+                if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();
@@ -394,6 +400,7 @@ namespace ExchangeAuditTool
 
                 bool sa = sel.IsSelected("permissions", "sendas");
                 bool sob = sel.IsSelected("permissions", "sendonbehalf");
+                bool autoDetect = sel.IsSelected("auto", "autodetect");
 
                 bool needResolver = sob;
                 var exprs = new List<string>();
@@ -412,6 +419,7 @@ namespace ExchangeAuditTool
 
                 var sb = new StringBuilder();
                 if (needResolver) { string getRecip = online ? "Get-EXORecipient" : "Get-Recipient"; PsScriptHelpers.EmitResolver(sb, getRecip, false); }
+                if (autoDetect) PsScriptHelpers.EmitRemoveEmptyColumns(sb);
 
                 sb.AppendLine("Write-Host 'Querying mail-enabled public folders...'");
                 sb.AppendLine("$items = @(Get-MailPublicFolder -ResultSize " + resultSize + ")");
@@ -453,6 +461,7 @@ namespace ExchangeAuditTool
                 }
 
                 sb.AppendLine();
+                if (autoDetect) sb.AppendLine("$rows = Remove-EmptyColumns $rows");
                 sb.Append(ctx.ExportCsv("$rows"));
                 sb.AppendLine("Write-Host 'Export complete.'");
                 return sb.ToString();
